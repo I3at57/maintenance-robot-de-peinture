@@ -341,9 +341,13 @@ revient à maximiser la vraisemblance.
 Après un développement, on obtient alors le système :
 
 $$
-\alpha^*= \left( \frac{1}{n}\sum_{i=1}^{n}x_i^{\beta^*}\right)^{\frac{1}{\beta^*}} \\
-\frac{1}{\beta^*}\frac{\sum_{i=1}^{n}ln(x_i)}{n}-
-\frac{\sum_{i=1}^{n}x_i^{\beta^*}ln(x_i)}{\sum_{i=1}^{n}x_i^{\beta^*}}=0
+\left\{
+  \begin{array}{ll}
+    \alpha^*= \left( \frac{1}{n}\sum_{i=1}^{n}x_i^{\beta^*}\right)^{\frac{1}{\beta^*}} \\
+    \frac{1}{\beta^*}\frac{\sum_{i=1}^{n}ln(x_i)}{n}-
+    \frac{\sum_{i=1}^{n}x_i^{\beta^*}ln(x_i)}{\sum_{i=1}^{n}x_i^{\beta^*}}=0
+  \end{array}
+\right.
 $$
 que l'on doit résoudre pour obtenir $\beta^*$ et $\alpha^*$ qui sont alors les
 estimateurs du maximum de vraisemblance que l'on notera $\hat{\alpha}_{MV}$ et
@@ -601,3 +605,160 @@ estim_param_duree_remplacement$TempsMoyen <- 1/estim_param_duree_remplacement$te
 estim_param_duree_remplacement
 ```
 
+On a donc a présent pour les composants du robot :
+- un estimation de la durée de vie du composant (loi de Weibull et les paramètres associés)
+- une estimation du temps de remplacement du composant
+(temps d'immobilisation du robot engendré. Loi exponentielles et le paramètre associé).
+
+## Discussions des résultats
+
+Les résultats obtenus peuvent être critiqués et doivent être mit en perspective
+avec le contexte général de l'analyse.
+
+Premièrement, nous avons écarté deux défaillance de la classification de Pareto.
+
+Puisque que ces défaillances ne touchent pas directement une pièce du robot et qu'elles
+sont rare et peu impactante sur le temps d'arrêt (10 et 35 minutes), ces deux défaillances
+auraient été incluses dans la classe C.
+Nous n'aurions donc dans tous les cas pas concentrer nos efforts sur l'optimisation
+de la politique de maintenance de ces éléments.
+
+Pour les estimations effecutés, plusieurs éléments doivent être prit en compte :
+
+- nous avons supposé les lois de probabilité (Weibull et Exponentielle) sans pour autant
+avoir testé l'adéquation de ces lois aux données.
+- nous disposons de très peu de donnée en général (parfois une seule panne référencée
+pour certain composants).
+
+Les résultats obtenus permettent donc une première analyses, mais devraient être
+améliorés si nous avions l'opportunité de récupérer plus de mesures.
+
+## Optimisation de la politique de maintenance pour les éléments de la classe A
+
+L'optimisation s'effectuera en deux temps. On cherchera dabord à determiner le
+coût de moyen de maintenance pour les composants de la classe A. Ensuite on
+cherchera les périodes de remplacement périodiques optimales pour ce composants.
+
+Nous procèderons à l'optimisation de la politique pour le composant E : "Nez robot".
+
+### Détermination du coût de maintenance moyen par unité de temps
+
+Deux coûts se rapportent à la maintenance d'un composant :
+
+- le coût d'immobilisation du robot $ci = 20€/min$.
+- le coût de remplacement, fixe, $cc = 30€$.
+
+Si l'on note $T_r$ la date de remise en service d'un composant après la panne,
+le coût moyen par unité de temps de la maintenance sera alors égal à :
+
+$$
+\mbox{Coût moyen par unité de temps de la maintenance} =
+\frac{E[\mbox{Coût cumulé de la maintenance}]}
+{E[T_r]}
+$$
+
+#### Détermination de la loi de remise en service
+
+On considère une politique de remplacement basée sut l’âge de l’élément.
+A partir de la mise en service du robot (soit la mise en service initiale, soit après le remplacement d'une pièce), on note $T_f$ la durée aléatoire du cycle jusqu'à la
+prochaine remise en service (après une panne ou une maintenance préventive).
+On a donc :
+
+- $T$ la période de remplacement préventif, déterministe, dont on cherchera à optimiser
+la valeur pour réduire les coûts de la politique de maintenance.
+- $T_f$ la date alétoire de la prochaine défaillance, qui dépend de la fiabilité du composant.
+Si on effectue un remplacement préventif, le composant est remit à neuf.
+- la durée d'inactivité $tp$ due à un remplacement préventif
+- la durée d'inactivité due à un remplacement correctif $D$.
+
+$T_r$ est donc une fonction de ces différents éléments, que l'on cherche à déterminer.
+
+La remise en service à une date $T_r$ est forcément consécutive à un remplacement
+correctif ou préventif. Les deux types de remplacement sont disjoint, on peut
+donc conditionner la date $T_r$ au type de remplacement efectué.
+
+La date $T$ de remplacement périodique étant fixé après un temps $T$ de fonctionnement
+sans défaillance, le type de remplacement dépend donc de la variable alétoire $T_f$
+la date de prochaine défaillance.
+
+On a donc :
+
+$$
+\left\{
+  \begin{array}{ll}
+    \mbox{Remplacement correctif si : } T_f < T \\
+    \mbox{Remplacement préventif si : } T_f > T \\
+  \end{array}
+\right.
+$$
+
+Si la maintenance est préventive pour un élément de la classe A, on a :
+
+$$
+P(\mbox{Remplacement préventif }|\omega) = P(T_f > T|\omega) = R_{\omega}(T)
+$$
+
+Or, pour rappel, $T_f$ pour un composant $\omega$ suit une loi de Weibull de
+paramètres $\alpha_{\omega}$ et $\beta_{\omega}$. Donc :
+
+$$
+P(\mbox{Remplacement préventif }|\omega) =
+R_{\mathbf{W}(\alpha_{\omega},\beta_{\omega})}(T)
+$$
+
+Puisque $T$ dépend de notre politique de maintenance, et que l'on a déterminé les
+parmètres des lois pour tous les composants, alors cette probabilité est fixe.
+
+Dans le cas d'un remplacement préventif, on est certain que la date de remise en
+service sera égal à $T+tp$ puisque que le temps de changement est fixe et dure
+$tp$ minutes, et qu'il a lieu après un temps $T$ sans défaillance.
+
+Donc :
+
+$$
+T_r|\mbox{Préventif} = T + p
+$$
+
+Donc le temps moyen de remise en service si le remplacement est préventif est
+aussi de $T+tp$ puisque l'espérance d'une constante est égal à cette constante.
+
+$$
+\mathbb{E}[T_r|\mbox{Préventif}] = \mathbb{E}[T+tp] = T+tp
+$$
+
+Si la maintenance est corrective pour un élément $\omega$ de la classe A:
+
+$$
+P(\mbox{Remplacement correctif }|\omega) = P(T_f < T|\omega) = F_{\omega}(T) =
+1-R_{\omega}(T) =
+1-R_{\mathbf{W}(\alpha_{\omega},\beta_{\omega})}(T)
+$$
+
+Et :
+
+$$
+T_r|\mbox{Correctif} = T_f + D
+$$
+
+Et :
+
+$$
+\mathbb{E}[T_r|\mbox{Correctif}] = \mathbb{E}[T_f] + \mathbb{E}[D]
+$$
+
+Donc on peut conclure que :
+
+$$
+T_r = (1-R_{\mathbf{W}(\alpha_{\omega},\beta_{\omega})}(T))(T_f + D)+
+R_{\mathbf{W}(\alpha_{\omega},\beta_{\omega})}(T)(T+tp)
+$$
+
+Et que : 
+
+$$
+\mathbb{E}[T_r] = (1-R_{\mathbf{W}(\alpha_{\omega},\beta_{\omega})}(T))
+(\mathbb{E}[T_f] + \mathbb{E}[D]) + R_{\mathbf{W}(\alpha_{\omega},\beta_{\omega})}
+(T+tp)
+$$
+On peut donc calculer $\mathbb{E}[T_r]$ pour chacun des composants en fonction des
+données disponibles.
