@@ -660,7 +660,7 @@ $$
 #### Détermination de la loi de remise en service
 
 On considère une politique de remplacement basée sut l’âge de l’élément.
-A partir de la mise en service du robot (soit la mise en service initiale, soit après le remplacement d'une pièce), on note $T_f$ la durée aléatoire du cycle jusqu'à la
+A partir de la mise en service du robot (soit la mise en service initiale, soit après le remplacement d'une pièce), on note $T_r$ la durée aléatoire du cycle jusqu'à la
 prochaine remise en service (après une panne ou une maintenance préventive).
 On a donc :
 
@@ -692,18 +692,21 @@ $$
 \right.
 $$
 
-Si la maintenance est préventive pour un élément de la classe A, on a :
+Si la maintenance est préventive pour un élément de la classe A noté $\omega$, on a :
 
 $$
 P(\mbox{Remplacement préventif }|\omega) = P(T_f > T|\omega) = R_{\omega}(T)
 $$
+
+Avec $R_{\omega}(T)$
 
 Or, pour rappel, $T_f$ pour un composant $\omega$ suit une loi de Weibull de
 paramètres $\alpha_{\omega}$ et $\beta_{\omega}$. Donc :
 
 $$
 P(\mbox{Remplacement préventif }|\omega) =
-R_{\mathbf{W}(\alpha_{\omega},\beta_{\omega})}(T)
+R_{\mathbf{W}(\alpha_{\omega},\beta_{\omega})}(T) = 
+(1-F_{\mathbf{W}(\alpha_{\omega},\beta_{\omega})}(T))
 $$
 
 Puisque $T$ dépend de notre politique de maintenance, et que l'on a déterminé les
@@ -731,7 +734,8 @@ Si la maintenance est corrective pour un élément $\omega$ de la classe A:
 $$
 P(\mbox{Remplacement correctif }|\omega) = P(T_f < T|\omega) = F_{\omega}(T) =
 1-R_{\omega}(T) =
-1-R_{\mathbf{W}(\alpha_{\omega},\beta_{\omega})}(T)
+1-R_{\mathbf{W}(\alpha_{\omega},\beta_{\omega})}(T) = \\
+F_{\mathbf{W}(\alpha_{\omega},\beta_{\omega})}(T)
 $$
 
 Et :
@@ -746,19 +750,146 @@ $$
 \mathbb{E}[T_r|\mbox{Correctif}] = \mathbb{E}[T_f] + \mathbb{E}[D]
 $$
 
+On peut alors donner une expression de $T_r$ :
+
+$$
+T_r = \left\{
+  \begin{array}{ll}
+    T_f + D & \mbox{ si } T_f \leq T \\
+    T + tp & \mbox{si } T_f > T \\
+  \end{array}
+\right.
+$$
+
+<!-- Comment
 Donc on peut conclure que :
 
 $$
 T_r = (1-R_{\mathbf{W}(\alpha_{\omega},\beta_{\omega})}(T))(T_f + D)+
 R_{\mathbf{W}(\alpha_{\omega},\beta_{\omega})}(T)(T+tp)
 $$
+-->
 
-Et que : 
+Finalement on a :
 
 $$
-\mathbb{E}[T_r] = (1-R_{\mathbf{W}(\alpha_{\omega},\beta_{\omega})}(T))
-(\mathbb{E}[T_f] + \mathbb{E}[D]) + R_{\mathbf{W}(\alpha_{\omega},\beta_{\omega})}
-(T+tp)
+\begin{array}{ll}
+\mathbb{E}[T_r] & = \mathbb{E}[
+(T_r|\mbox{Correctif})\mathbb{P}(\mbox{Correctif}) + 
+(T_r|\mbox{Préventif})\mathbb{P}(\mbox{Préventif}) 
+] \\
+& = F_{\mathbf{W}(\alpha_{\omega},\beta_{\omega})}(T) \cdot
+\mathbb{E}[T_r|\mbox{Correctif}] +
+(1-F_{\mathbf{W}(\alpha_{\omega},\beta_{\omega})}(T)) \cdot
+\mathbb{E}[T_r|\mbox{Préventif}]
+\\
+
+& = F_{\mathbf{W}(\alpha_{\omega},\beta_{\omega})}(T) \cdot
+(\mathbb{E}[T_f] + \mathbb{E}[D]) +
+(1-F_{\mathbf{W}(\alpha_{\omega},\beta_{\omega})}(T)) \cdot (T+tp)
+\end{array}
 $$
+
 On peut donc calculer $\mathbb{E}[T_r]$ pour chacun des composants en fonction des
-données disponibles.
+données disponibles. Les lois de probabilités étant calculés à partir des durée
+inter-défaillances, nous ne pourrons pas calculer $\mathbb{E}[T_r]$ pour les
+repère dont on ne possède pas ces données (donc les repère H et G).
+
+#### Détermination du coût cumulé jusqu'à la remise en service
+
+Pour obtenir cette information, on va procéder de la même facon que pour la loi de
+remise en service.
+
+Le coût cumulé de maintenance à la remise en service, noté $CC_r$ est une variable
+aléatoire dépendant du type de maintenance. Elle est composée :
+
+- du coût de remplacement fixe : $cc = 30€$.
+- du coût d'inactivité : $ci = 20€%min$.
+
+On peut alors écrire : $CC_r = cc + \mbox{Temps à l'arrêt en minutes } * ci$.
+
+Si la maintenance est corrective (donc si $T_f < T$) alors on a :
+$\mbox{Temps à l'arrêt en minutes } = D$ qui dépend du type de composant considéré.
+Dans ce cas si $T_f < T$ alors $CC_r = cc + D \cdot ci = 30 + 20D (€)$
+
+Si la maintenance est préventive (donc si $T_f > T$) alors on a :
+$\mbox{Temps à l'arrêt en minutes } = tp = 10 minutes$.
+Dans ce cas si $T_f > T$ alors $CC_r = cc + tp \times ci = 30 + 10 \times 20 = 230€$
+
+$$
+CC_r = \left\{
+  \begin{array}{ll}
+    cc + D \cdot ci & \mbox{si } T_f \leq T \\
+    cc + tp \cdot ci & \mbox{si } T_f > T \\
+  \end{array}
+\right.
+$$
+
+<!--
+On cherche l'expression du coût de maintenance cumulée, donc sa loi de probabilité.
+$CC_r$ est une variable aléatoire continue (car $D$ est une durée en temps continue),
+à valeurs dans $\mathbb{R}_+$. On cherche alors
+$\mathbb{P}(CC_r \leq k),\forall k \in \mathbb{R}_+$.
+
+On a donc l'expression du coût suivante :
+
+$$
+\begin{array}{ll}
+CC_r & = \mathbb{P}(\mbox{Correctif})(cc + D \cdot ci) + \mathbb{P}(\mbox{Préventif})
+(cc + tp \cdot ci)\\
+& = F_{\mathbf{W}(\alpha_{\omega},\beta_{\omega})}(T) \cdot (cc + D \cdot ci) +
+(1-F_{\mathbf{W}(\alpha_{\omega},\beta_{\omega})}(T)) \cdot (cc + tp \cdot ci)
+\end{array}
+$$
+
+On remarque que le coût d'un cycle ne dépend pas de la date de défaillance $T_f$
+mais uniquement de la durée de réparation $D$ dans le cas d'un
+remplacement correctif.
+-->
+
+On peut alors calculer l'espérance du coût de maintenance total pour $T$ :
+
+$$
+\mathbb{E}[CC_r(T)]=  F_{\mathbf{W}(\alpha_{\omega},\beta_{\omega})}(T)
+\cdot (cc + \mathbb{E}[D] \cdot ci) +
+(1-F_{\mathbf{W}(\alpha_{\omega},\beta_{\omega})}(T)) \cdot (cc + tp \cdot ci)
+$$
+
+Le coût final à $T_r$ ne dépend donc que de $T$ en moyenne. 
+
+<!--
+On peut exprimer la loi de cette variable aléatoire :
+
+$$
+\begin{array}{ll}
+  \mathbb{P}(CC_r \leq k)
+  & =
+  \mathbb{P}(CC_r \leq k | \mbox{Correctif}) \mathbb{P}(\mbox{Correctif}) + 
+  \mathbb{P}(CC_r \leq k | \mbox{Préventif}) \mathbb{P}(\mbox{Préventif}) \\
+  & =
+  F_{\mathbf{W}(\alpha_{\omega},\beta_{\omega})}(T) \cdot
+  \mathbb{P}(cc + ci \cdot D \leq k) +
+  
+  (1-F_{\mathbf{W}(\alpha_{\omega},\beta_{\omega})}(T)) \cdot
+  \mathbb{P}(cc + tp \cdot ci \leq k) \\
+  & =
+  F_{\mathbf{W}(\alpha_{\omega},\beta_{\omega})}(T) \cdot F_{E(\lambda_{\omega})}
+  (\frac{k-cc}{ci}) + (1-F_{\mathbf{W}(\alpha_{\omega},\beta_{\omega})}(T))
+  \cdot\mathbb{1}_{\{k \geq cc + tp \cdot ci\}}(k)
+\end{array}
+$$
+
+-->
+
+#### Évaluation de l'espérance du coût moyen de maintenance
+
+On a déjà calculé $\mathbb{E}[CC_r(T)]$ :
+
+$$
+\mathbb{E}[CC_r(T)]=  F_{\mathbf{W}(\alpha_{\omega},\beta_{\omega})}(T)
+\cdot (cc + \mathbb{E}[D] \cdot ci) +
+(1-F_{\mathbf{W}(\alpha_{\omega},\beta_{\omega})}(T)) \cdot (cc + tp \cdot ci)
+$$
+
+Ce résultat donne le coût moyen de maintenance à $T_r$ en fonction de $T$. On voit
+bien que 

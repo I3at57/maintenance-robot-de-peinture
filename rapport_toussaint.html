@@ -768,10 +768,14 @@ passer la log-vraissemblance.</p>
 log-vraissemblance revient à maximiser la vraisemblance.</p>
 <p>Après un développement, on obtient alors le système :</p>
 <p><span class="math display">\[
-\alpha^*= \left(
+\left\{
+  \begin{array}{ll}
+    \alpha^*= \left(
 \frac{1}{n}\sum_{i=1}^{n}x_i^{\beta^*}\right)^{\frac{1}{\beta^*}} \\
-\frac{1}{\beta^*}\frac{\sum_{i=1}^{n}ln(x_i)}{n}-
-\frac{\sum_{i=1}^{n}x_i^{\beta^*}ln(x_i)}{\sum_{i=1}^{n}x_i^{\beta^*}}=0
+    \frac{1}{\beta^*}\frac{\sum_{i=1}^{n}ln(x_i)}{n}-
+    \frac{\sum_{i=1}^{n}x_i^{\beta^*}ln(x_i)}{\sum_{i=1}^{n}x_i^{\beta^*}}=0
+  \end{array}
+\right.
 \]</span> que l’on doit résoudre pour obtenir <span class="math inline">\(\beta^*\)</span> et <span class="math inline">\(\alpha^*\)</span> qui sont alors les estimateurs
 du maximum de vraisemblance que l’on notera <span class="math inline">\(\hat{\alpha}_{MV}\)</span> et <span class="math inline">\(\hat{\beta}_{MV}\)</span>.</p>
 <p>Plusieurs solutions existent pour obtenir ses estimateurs sans passer
@@ -1028,6 +1032,250 @@ les estimateurs du maximum de vraisemblance. Cette fois, on suppose que
 les durées suivent des lois exponentielles.</p>
 <p>Cette loi étant plus simple que la loi de Weibull, il est possible
 d’obtenir l’estimateur du maximum de vraisemblance analytiquement.</p>
+<p><span class="math display">\[
+\hat{\lambda}_{MV} = \frac{n}{\sum_{i=1}^{n}(x_i)}=\frac{1}{\hat{m}}
+\]</span></p>
+<p>Soit l’inverse de la moyenne empirique de l’échantillon mesurée <span class="math inline">\(\hat{m}\)</span>.</p>
+<pre class="r"><code>estim_mv_expo &lt;- function(xi) {
+    1/mean(xi) %&gt;% return()
+}
+# Effectue le calcul de l&#39;inverse de la moyenne par repère
+estim_param_duree_remplacement &lt;- aggregate(temps_arret_min~Repère,
+                                          data = df_abc_noNA, estim_mv_expo)
+estim_param_duree_remplacement</code></pre>
+<pre><code>##   Repère temps_arret_min
+## 1      A      0.02702703
+## 2      B      0.06666667
+## 3      D      0.01132075
+## 4      E      0.01405405
+## 5      F      0.05625000
+## 6      G      0.10000000
+## 7      H      0.03333333
+## 8      I      0.01063830
+## 9      J      0.10000000</code></pre>
+<p>On peut ensuite calculer le temps moyen de remplacement :</p>
+<pre class="r"><code>estim_param_duree_remplacement$TempsMoyen &lt;- 1/estim_param_duree_remplacement$temps_arret_min
+estim_param_duree_remplacement</code></pre>
+<pre><code>##   Repère temps_arret_min TempsMoyen
+## 1      A      0.02702703   37.00000
+## 2      B      0.06666667   15.00000
+## 3      D      0.01132075   88.33333
+## 4      E      0.01405405   71.15385
+## 5      F      0.05625000   17.77778
+## 6      G      0.10000000   10.00000
+## 7      H      0.03333333   30.00000
+## 8      I      0.01063830   94.00000
+## 9      J      0.10000000   10.00000</code></pre>
+<p>On a donc a présent pour les composants du robot : - un estimation de
+la durée de vie du composant (loi de Weibull et les paramètres associés)
+- une estimation du temps de remplacement du composant (temps
+d’immobilisation du robot engendré. Loi exponentielles et le paramètre
+associé).</p>
+</div>
+<div id="discussions-des-résultats" class="section level2">
+<h2>Discussions des résultats</h2>
+<p>Les résultats obtenus peuvent être critiqués et doivent être mit en
+perspective avec le contexte général de l’analyse.</p>
+<p>Premièrement, nous avons écarté deux défaillance de la classification
+de Pareto.</p>
+<p>Puisque que ces défaillances ne touchent pas directement une pièce du
+robot et qu’elles sont rare et peu impactante sur le temps d’arrêt (10
+et 35 minutes), ces deux défaillances auraient été incluses dans la
+classe C. Nous n’aurions donc dans tous les cas pas concentrer nos
+efforts sur l’optimisation de la politique de maintenance de ces
+éléments.</p>
+<p>Pour les estimations effecutés, plusieurs éléments doivent être prit
+en compte :</p>
+<ul>
+<li>nous avons supposé les lois de probabilité (Weibull et
+Exponentielle) sans pour autant avoir testé l’adéquation de ces lois aux
+données.</li>
+<li>nous disposons de très peu de donnée en général (parfois une seule
+panne référencée pour certain composants).</li>
+</ul>
+<p>Les résultats obtenus permettent donc une première analyses, mais
+devraient être améliorés si nous avions l’opportunité de récupérer plus
+de mesures.</p>
+</div>
+<div id="optimisation-de-la-politique-de-maintenance-pour-les-éléments-de-la-classe-a" class="section level2">
+<h2>Optimisation de la politique de maintenance pour les éléments de la
+classe A</h2>
+<p>L’optimisation s’effectuera en deux temps. On cherchera dabord à
+determiner le coût de moyen de maintenance pour les composants de la
+classe A. Ensuite on cherchera les périodes de remplacement périodiques
+optimales pour ce composants.</p>
+<p>Nous procèderons à l’optimisation de la politique pour le composant E
+: “Nez robot”.</p>
+<div id="détermination-du-coût-de-maintenance-moyen-par-unité-de-temps" class="section level3">
+<h3>Détermination du coût de maintenance moyen par unité de temps</h3>
+<p>Deux coûts se rapportent à la maintenance d’un composant :</p>
+<ul>
+<li>le coût d’immobilisation du robot <span class="math inline">\(ci =
+20€/min\)</span>.</li>
+<li>le coût de remplacement, fixe, <span class="math inline">\(cc =
+30€\)</span>.</li>
+</ul>
+<p>Si l’on note <span class="math inline">\(T_r\)</span> la date de
+remise en service d’un composant après la panne, le coût moyen par unité
+de temps de la maintenance sera alors égal à :</p>
+<p><span class="math display">\[
+\mbox{Coût moyen par unité de temps de la maintenance} =
+\frac{E[\mbox{Coût cumulé de la maintenance}]}
+{E[T_r]}
+\]</span></p>
+<div id="détermination-de-la-loi-de-remise-en-service" class="section level4">
+<h4>Détermination de la loi de remise en service</h4>
+<p>On considère une politique de remplacement basée sut l’âge de
+l’élément. A partir de la mise en service du robot (soit la mise en
+service initiale, soit après le remplacement d’une pièce), on note <span class="math inline">\(T_r\)</span> la durée aléatoire du cycle jusqu’à
+la prochaine remise en service (après une panne ou une maintenance
+préventive). On a donc :</p>
+<ul>
+<li><span class="math inline">\(T\)</span> la période de remplacement
+préventif, déterministe, dont on cherchera à optimiser la valeur pour
+réduire les coûts de la politique de maintenance.</li>
+<li><span class="math inline">\(T_f\)</span> la date alétoire de la
+prochaine défaillance, qui dépend de la fiabilité du composant. Si on
+effectue un remplacement préventif, le composant est remit à neuf.</li>
+<li>la durée d’inactivité <span class="math inline">\(tp\)</span> due à
+un remplacement préventif</li>
+<li>la durée d’inactivité due à un remplacement correctif <span class="math inline">\(D\)</span>.</li>
+</ul>
+<p><span class="math inline">\(T_r\)</span> est donc une fonction de ces
+différents éléments, que l’on cherche à déterminer.</p>
+<p>La remise en service à une date <span class="math inline">\(T_r\)</span> est forcément consécutive à un
+remplacement correctif ou préventif. Les deux types de remplacement sont
+disjoint, on peut donc conditionner la date <span class="math inline">\(T_r\)</span> au type de remplacement efectué.</p>
+<p>La date <span class="math inline">\(T\)</span> de remplacement
+périodique étant fixé après un temps <span class="math inline">\(T\)</span> de fonctionnement sans défaillance, le
+type de remplacement dépend donc de la variable alétoire <span class="math inline">\(T_f\)</span> la date de prochaine défaillance.</p>
+<p>On a donc :</p>
+<p><span class="math display">\[
+\left\{
+  \begin{array}{ll}
+    \mbox{Remplacement correctif si : } T_f &lt; T \\
+    \mbox{Remplacement préventif si : } T_f &gt; T \\
+  \end{array}
+\right.
+\]</span></p>
+<p>Si la maintenance est préventive pour un élément de la classe A noté
+<span class="math inline">\(\omega\)</span>, on a :</p>
+<p><span class="math display">\[
+P(\mbox{Remplacement préventif }|\omega) = P(T_f &gt; T|\omega) =
+R_{\omega}(T)
+\]</span></p>
+<p>Avec <span class="math inline">\(R_{\omega}(T)\)</span></p>
+<p>Or, pour rappel, <span class="math inline">\(T_f\)</span> pour un
+composant <span class="math inline">\(\omega\)</span> suit une loi de
+Weibull de paramètres <span class="math inline">\(\alpha_{\omega}\)</span> et <span class="math inline">\(\beta_{\omega}\)</span>. Donc :</p>
+<p><span class="math display">\[
+P(\mbox{Remplacement préventif }|\omega) =
+R_{\mathbf{W}(\alpha_{\omega},\beta_{\omega})}(T)
+\]</span></p>
+<p>Puisque <span class="math inline">\(T\)</span> dépend de notre
+politique de maintenance, et que l’on a déterminé les parmètres des lois
+pour tous les composants, alors cette probabilité est fixe.</p>
+<p>Dans le cas d’un remplacement préventif, on est certain que la date
+de remise en service sera égal à <span class="math inline">\(T+tp\)</span> puisque que le temps de changement
+est fixe et dure <span class="math inline">\(tp\)</span> minutes, et
+qu’il a lieu après un temps <span class="math inline">\(T\)</span> sans
+défaillance.</p>
+<p>Donc :</p>
+<p><span class="math display">\[
+T_r|\mbox{Préventif} = T + p
+\]</span></p>
+<p>Donc le temps moyen de remise en service si le remplacement est
+préventif est aussi de <span class="math inline">\(T+tp\)</span> puisque
+l’espérance d’une constante est égal à cette constante.</p>
+<p><span class="math display">\[
+\mathbb{E}[T_r|\mbox{Préventif}] = \mathbb{E}[T+tp] = T+tp
+\]</span></p>
+<p>Si la maintenance est corrective pour un élément <span class="math inline">\(\omega\)</span> de la classe A:</p>
+<p><span class="math display">\[
+P(\mbox{Remplacement correctif }|\omega) = P(T_f &lt; T|\omega) =
+F_{\omega}(T) =
+1-R_{\omega}(T) =
+1-R_{\mathbf{W}(\alpha_{\omega},\beta_{\omega})}(T)
+\]</span></p>
+<p>Et :</p>
+<p><span class="math display">\[
+T_r|\mbox{Correctif} = T_f + D
+\]</span></p>
+<p>Et :</p>
+<p><span class="math display">\[
+\mathbb{E}[T_r|\mbox{Correctif}] = \mathbb{E}[T_f] + \mathbb{E}[D]
+\]</span></p>
+<!-- Comment
+Donc on peut conclure que :
+
+$$
+T_r = (1-R_{\mathbf{W}(\alpha_{\omega},\beta_{\omega})}(T))(T_f + D)+
+R_{\mathbf{W}(\alpha_{\omega},\beta_{\omega})}(T)(T+tp)
+$$
+-->
+<p>Finalement on a :</p>
+<p><span class="math display">\[
+\mathbb{E}[T_r] = (1-R_{\mathbf{W}(\alpha_{\omega},\beta_{\omega})}(T))
+(\mathbb{E}[T_f] + \mathbb{E}[D]) +
+R_{\mathbf{W}(\alpha_{\omega},\beta_{\omega})}
+(T+tp)
+\]</span></p>
+<p>On peut donc calculer <span class="math inline">\(\mathbb{E}[T_r]\)</span> pour chacun des
+composants en fonction des données disponibles. Les lois de probabilités
+étant calculés à partir des durée inter-défaillances, nous ne pourrons
+pas calculer <span class="math inline">\(\mathbb{E}[T_r]\)</span> pour
+les repère dont on ne possède pas ces données (donc les repère H et
+G).</p>
+</div>
+<div id="détermination-du-coût-cumulé-jusquà-la-remise-en-service" class="section level4">
+<h4>Détermination du coût cumulé jusqu’à la remise en service</h4>
+<p>Pour obtenir cette information, on va procéder de la même facon que
+pour la loi de remise en service.</p>
+<p>Le coût cumulé de maintenance à la remise en service, noté <span class="math inline">\(CC_r\)</span> est une variable aléatoire dépendant
+du type de maintenance. Elle est composée :</p>
+<ul>
+<li>du coût de remplacement fixe : <span class="math inline">\(cc =
+30€\)</span>.</li>
+<li>du coût d’inactivité : <span class="math inline">\(ci =
+20€%min\)</span>.</li>
+</ul>
+<p>On peut alors écrire : <span class="math inline">\(CC_r = cc +
+\mbox{Temps à l&#39;arrêt en minutes } * ci\)</span>.</p>
+<p>Si la maintenance est corrective (donc si <span class="math inline">\(T_f &lt; T\)</span>) alors on a : <span class="math inline">\(\mbox{Temps à l&#39;arrêt en minutes } =
+D\)</span> qui dépend du type de composant considéré. Dans ce cas si
+<span class="math inline">\(T_f &lt; T\)</span> alors <span class="math inline">\(CC_r = cc + D * ci = 30 + 20D (€)\)</span></p>
+<p>Si la maintenance est préventive (donc si <span class="math inline">\(T_f &gt; T\)</span>) alors on a : <span class="math inline">\(\mbox{Temps à l&#39;arrêt en minutes } = tp = 10
+minutes\)</span>. Dans ce cas si <span class="math inline">\(T_f &gt;
+T\)</span> alors <span class="math inline">\(CC_r = cc + tp \times ci =
+30 + 10 \times 20 = 230€\)</span></p>
+<p>On cherche l’expression du coût de maintenance cumulée, donc sa loi
+de probabilité. <span class="math inline">\(CC_r\)</span> est une
+variable aléatoire continue (car <span class="math inline">\(D\)</span>
+est une durée en temps continue), à valeurs dans <span class="math inline">\(\mathbb{R}_+\)</span>. On cherche alors <span class="math inline">\(\mathbb{P}(CC_r \leq k),\forall k \in
+\mathbb{R}_+\)</span>.</p>
+<p><span class="math display">\[
+\begin{array}{ll}
+  \mathbb{P}(CC_r \leq k)
+  &amp; =
+  \mathbb{P}(CC_r \leq k | \mbox{Correctif})
+\mathbb{P}(\mbox{Correctif}) +
+  \mathbb{P}(CC_r \leq k | \mbox{Préventif})
+\mathbb{P}(\mbox{Préventif}) \\
+  &amp; =
+  (1-R_{\mathbf{W}(\alpha_{\omega},\beta_{\omega})}(T))
+  \mathbb{P}(cc + ci \cdot D \leq k) +
+  R_{\mathbf{W}(\alpha_{\omega},\beta_{\omega})}(T)
+  \mathbb{P}(cc + tp \cdot ci \leq k) \\
+  &amp; =
+  (1-R_{\mathbf{W}(\alpha_{\omega},\beta_{\omega})}(T)) \cdot
+F_{E(\lambda_{\omega})}
+  (\frac{k-cc}{ci}) + R_{\mathbf{W}(\alpha_{\omega},\beta_{\omega})}(T)
+  \cdot\mathbb{1}_{\{k \geq cc + tp \cdot ci\}}(k)
+\end{array}
+\]</span></p>
+<p>Avec</p>
+</div>
+</div>
 </div>
 </div>
 
