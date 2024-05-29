@@ -1,0 +1,289 @@
+# Annexes
+
+Annexes regroupant différents travaux complémentaires.
+
+## 1. Tentative de calcul litéral de $\mathbb{E}[T_r]$
+
+Avec :
+
+$$
+T_r = \left\{
+  \begin{array}{ll}
+    T_f + D & \mbox{ si } T_f \leq T \\
+    T + tp & \mbox{si } T_f > T \\
+  \end{array}
+\right.
+$$
+
+On peut penser que :
+
+$$
+\begin{array}{ll}
+\mathbb{E}[T_r] & = \mathbb{E}[
+(T_r|\mbox{Correctif})\mathbb{P}(\mbox{Correctif}) + 
+(T_r|\mbox{Préventif})\mathbb{P}(\mbox{Préventif}) 
+] \\
+& = F_{\mathbf{W}(\alpha_{\omega},\beta_{\omega})}(T) \cdot
+\mathbb{E}[T_r|\mbox{Correctif}] +
+(1-F_{\mathbf{W}(\alpha_{\omega},\beta_{\omega})}(T)) \cdot
+\mathbb{E}[T_r|\mbox{Préventif}]
+\\
+
+& = F_{\mathbf{W}(\alpha_{\omega},\beta_{\omega})}(T) \cdot
+(\mathbb{E}[T_f] + \mathbb{E}[D]) +
+(1-F_{\mathbf{W}(\alpha_{\omega},\beta_{\omega})}(T)) \cdot (T+tp)
+\end{array}
+$$
+
+Ce résultat est faux, puisque la valeur de $T_r$ dans le cas correctif, n'est
+pas indépendante de $T_f$.
+
+Si l'on utilise ce calcul théorique de $\mathbb{E}[T_r](T)$ et qu'on
+le compare aux résultats simulés pour
+différentes valeurs de $T$ on a :
+
+```{r}
+# Routine pour calculer par simulation l'espérance de la date de remise en
+# service E[Tr] pour plusieurs valeurs de T
+
+# Paramètre de mon système en heures
+# Loi de durée de vie du système (ici données pour le composant E)
+alpha <- 225.61302
+beta <- 3.5031918
+# Loi de durée de réparation (données pour E)
+lambda <- 0.8432432
+# Périodes de remplacement périodique
+T <- 200
+# Temps de remplacement périodique
+tp <- 10 / 60
+
+# MTTF du composant
+esp_Tf <- alpha * gamma(1 + 1/beta)
+# Durée moyenne de remplacement périodique du composant
+esp_D <- 1/lambda
+
+# On va faire varier T tout en appliquant la logique précédente pour calculer
+# par simulation sur un seul T
+
+T_lim <- 500
+sec_T <- seq(1,T_lim,1)
+res_A <- seq(1,T_lim,1)
+res_B <- seq(1,T_lim,1)
+for (t in sec_T) {
+	# contient les trajectoires du système.
+	list_traj <- c()
+	p <- 2000 # nombre de réplications
+	for (i in 1:p) {
+		# simule une date de panne aléatoire
+		Tf <- rweibull(1, shape = beta, scale = alpha)
+		# simule un temps de réparation corrective aléatoire
+		D <- rexp(1, rate = lambda)
+		if (Tf <= t) {
+			# Dans ce cas maintenance corrective
+			list_traj <- c(list_traj, Tf + D)
+		} else {
+			# Dans ce cas maintenance préventive
+			list_traj <- c(list_traj, t + tp)
+		}
+	}
+	res_A[t] <- mean(list_traj)
+	
+	
+	# Probabilité d'obtenir une maintenance corrective
+	FT <- pweibull(t, shape = beta, scale = alpha)
+	# calcul théorique
+	res_B[t] <- FT * (esp_Tf + esp_D) + (1-FT) * (t + tp)
+}
+
+# Affichage des résultats
+ggplot() +
+	geom_line(aes(x = sec_T, y = res_A, color = "Par simulation")) +
+	geom_line(aes(x = sec_T, y = res_B, color = "Analytique")) +
+	# geom_line(aes(x = sec_T, y = sec_T)) +
+	# ylim(0,300) +
+	# xlim(0,200) +
+	labs(x = "Valeur T : temps avant inspection",
+		 y = "Espérance de Tr",
+		 title = "Comparaison de l'évolution de l'espérance de Tr en fonction
+         de T") +
+	scale_color_manual(name = "Mode de calcul",
+					   values = c("Par simulation" = "blue",
+					   		   "Analytique" = "red")) +
+	custom_theme
+```
+
+On remarque que notre résultat analytique ne colle pas au résultat obtenu par
+simulation.
+
+On peut démontrer que le résultat analytique calculé plus haut est faux.
+
+On sait que :
+
+$$
+T_r = \left\{
+  \begin{array}{ll}
+    T_f + D & \mbox{ si } T_f \leq T \\
+    T + tp & \mbox{si } T_f > T \\
+  \end{array}
+\right.
+$$
+
+Si le composant ne tombe jamais en panne, alors $T_r = T + tp$ donc
+$\mathbb{E}[T_r](T) = T + tp$.
+
+Si il y a des pannes 
+
+```{r}
+# Affichage des résultats
+ggplot() +
+	geom_line(aes(x = sec_T, y = res_A, color = "Par simulation")) +
+	geom_line(aes(x = sec_T, y = res_B, color = "Analytique")) +
+	geom_line(aes(x = sec_T, y = sec_T + tp, color = "Pas de panne")) +
+	xlim(0,400) +
+	ylim(0,250) +
+	labs(x = "Valeur T : temps avant inspection",
+		 y = "Espérance de Tr",
+		 title = "Comparaison de l'évolution de l'espérance de Tr en fonction
+         de T") +
+	scale_color_manual(name = "Mode de calcul",
+					   values = c("Par simulation" = "blue",
+					   		   "Analytique" = "red",
+					   		   "Pas de panne" = "black")) +
+	custom_theme
+```
+
+
+## 2. Calcul litéral de $CC_r
+
+Comme :
+
+$$
+CC_r = \left\{
+  \begin{array}{ll}
+    cc + D \cdot ci & \mbox{si } T_f \leq T \\
+    cc + tp \cdot ci & \mbox{si } T_f > T \\
+  \end{array}
+\right.
+$$
+
+$$
+\begin{array}{ll}
+CC_r & = \mathbb{P}(\mbox{Correctif})(cc + D \cdot ci) + \mathbb{P}(\mbox{Préventif})
+(cc + tp \cdot ci)\\
+& = F_{\mathbf{W}(\alpha_{\omega},\beta_{\omega})}(T) \cdot (cc + D \cdot ci) +
+(1-F_{\mathbf{W}(\alpha_{\omega},\beta_{\omega})}(T)) \cdot (cc + tp \cdot ci)
+\end{array}
+$$
+
+On remarque que le coût d'un cycle ne dépend pas de la date de défaillance $T_f$
+mais uniquement de la durée de réparation $D$ dans le cas d'un
+remplacement correctif.
+
+Ici le calcul littéral fonctionne, puisque la valeur de $CC_r$, dans le cas 
+correctif, est une variable aléatoire ne dépendant pas de $T_f$ (car $D$ est
+indépendant de $T_f$).
+
+On peut donc conditionner facilement l'expression de $CC_r$.
+
+## 3. Loi de $CC_r$
+
+On peut exprimer la loi de cette variable aléatoire :
+
+$$
+\begin{array}{ll}
+  \mathbb{P}(CC_r \leq k)
+  & =
+  \mathbb{P}(CC_r \leq k | \mbox{Correctif}) \mathbb{P}(\mbox{Correctif}) + 
+  \mathbb{P}(CC_r \leq k | \mbox{Préventif}) \mathbb{P}(\mbox{Préventif}) \\
+  & =
+  F_{\mathbf{W}(\alpha_{\omega},\beta_{\omega})}(T) \cdot
+  \mathbb{P}(cc + ci \cdot D \leq k) +
+  
+  (1-F_{\mathbf{W}(\alpha_{\omega},\beta_{\omega})}(T)) \cdot
+  \mathbb{P}(cc + tp \cdot ci \leq k) \\
+  & =
+  F_{\mathbf{W}(\alpha_{\omega},\beta_{\omega})}(T) \cdot F_{E(\lambda_{\omega})}
+  (\frac{k-cc}{ci}) + (1-F_{\mathbf{W}(\alpha_{\omega},\beta_{\omega})}(T))
+  \cdot\mathbb{1}_{\{k \geq cc + tp \cdot ci\}}(k)
+\end{array}
+$$
+
+## 4. Optimisation suivant la politique de la classe A pour tous les composants
+
+```{r}
+# Fonction qui va calculer une moyenne mobile sur les données simulée
+# Elle retourne ensuite la valeur minimale de la moyenne mobile et le
+# T correspondant
+# Si l'on considère que les erreurs de simulations sont aléatoires à la hausse
+# comme à la baisse, la moyenne mobile compense ces erreurs et
+# donne une valeur de T plausible sans avoir à passer par une 
+# succession de graphiques, ce qui permet d'automatisation.
+afficher_variation_cut_2 <- function(T_set, param, p = 1000) {
+  res_list <- c()
+  for (t in T_set) {
+    param$T <- t
+    res_list <- c(res_list, simulation_cut(param, p))
+  }
+  
+  n <- length(T_set)
+  
+  moyenne_mobile <- c()
+  for (i in 3:(n-2)) {
+    moyenne_mobile <- c(moyenne_mobile,
+                        mean(res_list[seq(i-2,i+2,1)]))
+  }
+  
+  p <- ggplot() +
+    geom_line(aes(x = T_set, y = res_list)) +
+  	geom_line(aes(x = T_set[3:(n-2)], y = moyenne_mobile), color = 'red')
+    labs(x = "T", y = "CUT(T)",
+         title = "Variation du coût par unité de temps (CUT) en
+         fonction de la période de remplacement périodique T")
+  
+  return(list(
+    cut = min(moyenne_mobile),
+    T = T_set[which(moyenne_mobile == min(moyenne_mobile))],
+    graph = p
+  ))
+}
+```
+
+```{r}
+ans <- afficher_variation_cut_2(seq(80,140,1), parametres, p = 10000)
+ans
+```
+
+
+```{r}
+repere <- estim_max_likelihood$Repère
+t_opti <- c()
+cut_opti <- c()
+for (w in repere) {
+  parametres = list(
+    alpha = estim_max_likelihood[estim_max_likelihood$Repère == w,]$Alpha_h,
+    beta = estim_max_likelihood[estim_max_likelihood$Repère == w,]$Beta,
+    lambda = estim_param_duree_remplacement[
+      estim_param_duree_remplacement$Repère == w,
+    ]$lambda_h,
+    tp = 10 / 60, # en heures
+    T = 0, # en heures
+    # Temps de remplacement périodique en heures
+    tp = 10 / 60,
+    # coût de changement fixe
+    cc = 30,
+    # coût d'indisponibilité par heures
+    ci = 20 * 60
+  )
+  ans <- afficher_variation_cut_2(seq(10,300,1), parametres, p = 5000)
+  ans
+  t_opti <- c(t_opti, ans$T)
+  cut_opti <- c(cut_opti, ans$cut)
+}
+politique_maintenance <- tibble(repere,t_opti,cut_opti)
+```
+
+```{r}
+politique_maintenance
+```
+
+On a donc trouvé les politiques de maintenances optimales pour les différents composants.

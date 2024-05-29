@@ -1,0 +1,201 @@
+## Classification des pannes par la méthode ABC.
+
+Le principe de Pareto stipule qu'environ 80 % des effets sont le produit de 20 % des causes ([Principe de Pareto, Wikipédia](https://fr.wikipedia.org/wiki/Principe_de_Pareto)). Ce principe général à été observé par l'italien Vilfredo Pareto et on peut l'appliquer 
+à différents phénomène observables.
+
+Ce principe ne doit pas être appliqué à la lettre mais est une première approche souvent pertinente pour identifier les éléments prépondérant dans un phénomène et prioriser les actions.
+
+La méthode ABC s'appuie sur ce principe de Pareto, en répartissant les éléments observés en trois classes : A, B et C, selon leurs effets pour le phénomène observé.
+
+Appliqué au problématique de maintenance, on peut donc imaginer que 80% des coûts de maintenances sont issus de 20% des pannes, que l'on classera alors dans la catégorie A. Les 15% des coûts suivants sont le fruit de 30% des défaillances : la classe B. Enfin, la majorité des défaillance, soit les 50%
+restants, ne jouent que sur 5% des coût totaux de maintenance. Ils constituent alors la classe C.
+
+Pour chaque panne identifiées par le retour d'expérience, on va calculer le coût associé.
+
+On pourra alors calculer un coût total de maintenance et observer quelles pannes contribuent le plus à ce coût total. Ces pannes seront alors prioritaires dans nos améliorations de politiques de maintenance.
+
+### Calcul du coût d'une panne.
+
+L'analyse des coût a permis d'identifier deux coûts associés à une panne :
+
+- le coût de remplacement (coût de changement) d'une pièce estimé à $30€$ ;
+- le coût d'inactivité estimé à $20€/min$.
+
+On constate immédiatement que le coût immobilisation est prépondérant dans.
+le coût total de la politique de maintenance : deux minutes d'arrêts sont plus coûteuses qu'un changement de pièce.
+
+Le coût de remplacement étant fixe et identique pour chaque composant du robot, on peut se concentrer sur le coût d'immobilisation dans notre classification.
+
+On va donc construire un diagramme ABC basée sur le temps d'arrêt des pannes associé à chaque élément pour identifier les éléments dont les pannes immobilisent le plus le robot.
+
+### Construction du graphique ABC
+
+Le retour d'expérience est composé des données suivantes :
+
+- `Date` : la date d'observation de la défaillance ;
+- `temps d'arrêt` : temps d'arrêt observé pour cette défaillance ;
+- `Nature du travail/défaut` décrit la défaillance et les opérations associées ;
+- `Désignation` : le nom du composant défaillant ;
+- `Repère` : le repère du composant défaillant.
+
+Dans notre cas, ce sont les attributs : `temps d'arrêt` et `Repère` qui nous intéressent le plus.
+
+```{r}
+# Récupère dans `df_abc` que les colonnes utiles pour cette partie du projet
+df_abc <- df %>% select("temps d'arrêt","Repère")
+df_abc
+```
+
+Le temps d'arrêt étant stocké en tant que numérique, il faut les convertir
+en valeur numérique.
+
+```{r}
+# convertit la colonne `temps d'arrêt` (char) en une colonne `temps_arret_min`
+# en numérique (double)
+df_abc <- df_abc %>% mutate(
+    temps_arret_min = as.numeric(
+        str_sub(`temps d'arrêt`,start = 1, end = -5)
+    )
+)
+df_abc
+```
+
+Deux mesures ne possèdent pas de repère : cela signifie que la défaillance, selon les opérateurs chargés de répertorier les défaillances, ne concernent pas une partie spécifique du robot.
+
+Dans un premier temps je propose d'ignorer ces défaillances que je qualifierai de "non attribuées". On discutera par la suite de la manière de les intégrer à l'analyse.
+
+```{r}
+# Retire les lignes contenant des NA
+df_abc_noNA <- df_abc[!is.na(df_abc$Repère),]
+df_abc_noNA
+```
+
+```{r}
+temps_arret_total <- sum(df_abc_noNA$temps_arret_min)
+temps_arret_total
+```
+
+```{r}
+# Effectue le calcul du temps total d'arrêt par repère puis
+# classe par ordre décroissant
+somme_temps_arret_par_repere <- aggregate(temps_arret_min~Repère,
+                                          data = df_abc_noNA, sum) %>%
+    arrange(desc(temps_arret_min))
+
+somme_temps_arret_par_repere
+```
+
+```{r}
+# Ajoute un point fictif en (0,0) pour le graphique suivant
+x_set <- c("", somme_temps_arret_par_repere$Repère); x_set
+y_set <- c(0, cumsum(somme_temps_arret_par_repere$temps_arret_min)); y_set
+```
+
+À noter que les défaillances avec pour repère H et G sont des défaillances
+ne se rapportant pas directement au robot :
+- H : Disquette
+- G : Manque de pression
+
+```{r}
+# ggplot permet de créer de plus jolis graphiques et est facilement
+# utilisable pour un résultat proche de ce que l'on souhaite avoir
+ggplot(mapping = aes(x = 0:9, y = y_set))+
+    geom_line() +
+    scale_x_continuous(breaks = 0:9,
+                     labels = x_set) + 
+    labs(x = "Repère de défaillance",
+         y = "Temps cumulé en min",
+         title = "Temps cumulé en min des différents repère de défaillance
+         classés par ordre décroisant issu du REX") +
+    custom_theme
+```
+
+Avec ce graphique, on peut facilement voir par exemple que le temps d'arrêt
+cumulé des défaillances sur les repères E et D avoisine les 1500 minutes.
+
+Comme on connait le coût d'arrêt par minute qui est de $ci=20€/min$, on peut facilement
+produire le même graphique mais cette fois en € :
+
+```{r}
+# cout d'arret par minute en euro
+ci = 20
+ggplot(mapping = aes(x = 0:9, y = y_set * ci))+
+    geom_line() +
+    scale_x_continuous(breaks = 0:9,
+                     labels = x_set) + 
+    labs(x = "Repère de défaillance",
+         y = "Coûts cumulés en €",
+         title = "Coûts cumulés en euros des arrêts dus
+         aux défaillances des différents repère,
+         classés par ordre décroisant, issu du REX") +
+    custom_theme
+```
+
+Pour simplifier la lecture, et distinguer nos classes A, B et C, je propose de
+retourner sur l'analyse des temps d'arrêt (équivalent au coût par un simple
+produit) et de raisonner en % du temps total d'arrêt mesuré.
+
+On va séparer les repères dans les classes suivantes par ordre de contribution au temps d'arrêt total :
+
+ - Classe A : Repères E et D soit "Nez robot" et "Poignées de programmation"
+ - Classe B : "Electrovanne pistolet" et "Fin de course du support bras"
+ - Classe C : le reste.
+ 
+```{r}
+ggplot(mapping = aes(x = 0:9, y = 100*y_set/temps_arret_total))+
+    geom_line() +
+    ylim(c(0,100)) +
+    scale_x_continuous(breaks = 0:9,
+                     labels = x_set) + 
+    labs(x = "Repère de défaillance",
+         y = "% coût cumulé en €",
+         title = "% du coût d'immobilisation cumulé en € des différents repère de défaillance
+         classés par ordre croisant") +
+    geom_hline(yintercept = 100*y_set[3]/temps_arret_total,
+               color = 'red') +
+    annotate(geom = "text",
+             x = 0,
+             y = 100*y_set[3]/temps_arret_total+5,
+             label = paste(
+                 round(100*y_set[3]/temps_arret_total),"%"),
+             color = 'red') +
+    geom_area(aes(x = 0:2, y = 100*y_set[3]/temps_arret_total),
+              fill = 'red',
+              alpha = 0.4,
+              color = 'red') +
+    geom_hline(yintercept = 100*y_set[5]/temps_arret_total,
+               color = 'orange') +
+    annotate(geom = "text",
+             x = 1,
+             y = 100*y_set[5]/temps_arret_total+5,
+             label = paste(
+                 round(100*y_set[5]/temps_arret_total),"%"),
+             color = 'orange') +
+    geom_area(aes(x = 2:4, y = 100*y_set[5]/temps_arret_total),
+              fill = 'orange',
+              alpha = 0.4,
+              color = 'orange') +
+    geom_area(aes(x = 4:9, y = 100),
+              fill = 'green',
+              alpha = 0.4,
+              color = 'green') +
+    annotate(geom = "text", x = 1, y = 25, label = "E & D", color = 'red',
+             size = 10) +
+    annotate(geom = "text", x = 3, y = 50, label = "A & F", color = 'orange',
+             size = 10) +
+    annotate(geom = "text", x = 6.5, y = 60, label = "I, H, B, G, J", color = 'limegreen',
+             size = 10) +
+    custom_theme
+```
+
+Sur le graphique on peut alors observer que les défaillances liées aux repères E et D (la classe A),
+soit le "Nez robot" et la "Poignées de programmation" représentent à elles
+seules 74% du coût d'immobilisation (puisque ces défaillances représentent
+74% du temps d'immobilisation total).
+
+La classe B représente 18% du coût total d'immobilisation.
+
+Les autres défaillances (classe C) représentent donc 8% du temps total
+d'immobilisation.
+
+La priorité devra donc être mise sur la politique de maintenance des composants des classes A et B (les repères E, D, A, F).

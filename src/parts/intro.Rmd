@@ -1,0 +1,44 @@
+# Projet : Maintenance d’un robot de peinture
+
+Dans ce projet on étudie la maintenance d'un robot permettant de positionner un
+pistolet de peinture.
+
+![Plan schématique d'un robot de peinture](./img/image_robot.png)
+
+## Présentation du robot
+
+Le robot à pour mission de positionner dans l'espace un pistolet à
+peinture. Le pistolet est actionné par un autre système qui n'est pas
+étudié ici.
+
+Le robot doit donc positionner avec précision et au bon moment le
+pistolet pour permettre ensuite au pistolet d'appliquer la peinture.
+
+Le robot est composé des éléments suivants :
+
+- (A) l'électrovanne du pistolet ;
+- (B) Vérins ;
+- (D) Poignets de programmation ;
+- (E) Nez robot ;
+- (F) Fin de course support bras ;
+- (I) Carte DH ;
+- (J) Carte Servo.
+
+## Objectif de l'analyse
+
+L'objectif est de proposer pour l'entreprise un nouveau plan de maintenance visant à minimiser
+les coûts associés à la maintenance de ce robot.
+
+Nous disposons pour cela de deux sources de données :
+
+- un historique de durée inter-panne en heures de fonctionnement
+pour chaque composant du robot ;
+- Un retour d'expérience détaillant certaines pannes pour les différents composants du robot. Ce retour d'expérience prend la
+forme d'un tableau excel dans lequel on retrouve, pour chaque panne
+renseignée.
+
+Dans un premier temps, on cherchera à classer les différents types de pannes selon la méthode ABC pour identifier quelles pannes sont prépondérantes dans les coûts totaux liés à la maintenance.
+
+On essaiera ensuite de déterminer les paramètres des lois de durée de vie des composants en supposant qu'il s'agit de loi de Weibull. On estimera aussi le paramètre de la loi exponentielle associée au changement correctif visant à remplacer les éléments.
+
+Enfin nous pourrons optimiser les politiques de maintenance pour les pannes de la classe A et B identifiées en début d'analyse.

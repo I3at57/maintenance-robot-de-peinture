@@ -1,0 +1,545 @@
+## Optimisation de la politique de maintenance pour les éléments de la classe A
+
+L'optimisation s'effectuera en deux temps. On cherchera d’abord à construire une
+méthode pour simuler le coût moyen par unité de temps d'une politique de maintenance
+avec une période de visite préventive quelconque $T$.
+
+On cherchera ensuite les périodes de remplacement périodiques optimales $T*$ 
+pour ces composants.
+
+### Détermination du coût de maintenance moyen par unité de temps en fonction de la politique de maintenance pour tout $T$.
+
+On cherche à simuler le coût moyen par unité de temps de la maintenance en fonction
+de la politique de maintenue.
+
+Deux coûts se rapportent à la maintenance d'un composant :
+
+- le coût d'immobilisation du robot $ci = 20€/min$.
+- le coût de remplacement, fixe, $cc = 30€$.
+
+Si l'on note $T_r$ la date de remise en service d'un composant après la panne,
+et $CC_r$ le coût total
+de la maintenance à la date $T_r$, 
+le coût par unité de temps de la maintenance, noté $CUT$ sera alors égal à :
+
+$$
+CUT =
+\frac{CC_r}
+{T_r}
+$$
+
+Toutes ces grandeurs sont dépendante de la période d'inspection $T$, on peut alors
+noter :
+
+$$
+CUT(T) =
+\frac{CC_r(T)}
+{T_r(T)}
+$$
+
+Cette grandeur est une variable aléatoire, hors pour comparer les performances
+d'une politique de maintenance, il faut raisonner en moyenne, on cherche donc 
+à calculer l'espérance du coût moyen par unité de temps, soit :
+
+$$
+\mathbb{E}[CUT(T)] =
+\frac{\mathbb{E}[CC_r(T)]}
+{\mathbb{E}[T_r(T)]}
+$$
+
+#### Détermination de la loi de remise en service $T_r(T)$
+
+On considère une politique de remplacement basée sut âge de élément.
+A partir de la mise en service du robot (soit la mise en service initiale, soit après le remplacement d'une pièce), on note $T_r(T)$ la durée aléatoire du cycle jusqu'à la
+prochaine remise en service (après une panne ou une maintenance préventive).
+On a donc :
+
+- $T$ la période de remplacement préventif, déterministe, dont on cherchera à optimiser
+la valeur pour réduire les coûts de la politique de maintenance.
+- $T_f$ la date aléatoire de la prochaine défaillance, qui dépend de la fiabilité du composant.
+Si on effectue un remplacement préventif, le composant est remit à neuf.
+- la durée d'inactivité $tp$ due à un remplacement préventif
+- la durée d'inactivité due à un remplacement correctif $D$.
+
+$T_r$ est donc une fonction de ces différents éléments, que l'on cherche à déterminer.
+
+La remise en service à une date $T_r$ est forcément consécutive à un remplacement
+correctif ou préventif. Les deux types de remplacement sont disjoint, on peut
+donc conditionner la date $T_r$ au type de remplacement effectué.
+
+La date $T$ de remplacement périodique étant fixé après un temps $T$ de fonctionnement
+sans défaillance, le type de remplacement dépend donc de la variable aléatoire $T_f$
+la date de prochaine défaillance.
+
+On a donc :
+
+$$
+\left\{
+  \begin{array}{ll}
+    \mbox{Remplacement correctif si : } T_f < T \\
+    \mbox{Remplacement préventif si : } T_f > T \\
+  \end{array}
+\right.
+$$
+
+Si la maintenance est préventive pour un élément de la classe A noté $\omega$, on a :
+
+$$
+P(\mbox{Remplacement préventif }|\omega) = P(T_f > T|\omega) = 1-F_{\omega}(T)
+$$
+
+Puisque $T$ dépend de notre politique de maintenance, et que l'on a déterminé les
+paramètres des lois pour tous les composants, alors cette probabilité est fixe.
+
+Dans le cas d'un remplacement préventif, on est certain que la date de remise en
+service sera égal à $T+tp$ puisque que le temps de changement est fixe et dure
+$tp$ minutes, et qu'il a lieu après un temps $T$ sans défaillance.
+
+Donc :
+
+$$
+T_r|\mbox{Préventif} = T + p
+$$
+
+Donc le temps moyen de remise en service si le remplacement est préventif est
+aussi de $T+tp$ puisque l'espérance d'une constante est égal à cette constante.
+
+$$
+\mathbb{E}[T_r|\mbox{Préventif}] = \mathbb{E}[T+tp] = T+tp
+$$
+
+Si la maintenance est corrective pour un élément $\omega$ de la classe A:
+
+$$
+P(\mbox{Remplacement correctif }|\omega) = P(T_f < T|\omega) = F_{\omega}(T) =
+1-R_{\omega}(T) =
+1-R_{\mathbf{W}(\alpha_{\omega},\beta_{\omega})}(T) = \\
+F_{\mathbf{W}(\alpha_{\omega},\beta_{\omega})}(T)
+$$
+
+Et :
+
+$$
+T_r|\mbox{Correctif} = T_f + D
+$$
+
+Et :
+
+$$
+\mathbb{E}[T_r|\mbox{Correctif}] = \mathbb{E}[T_f] + \mathbb{E}[D]
+$$
+
+On peut alors donner une expression de $T_r$ :
+
+$$
+T_r = \left\{
+  \begin{array}{ll}
+    T_f + D & \mbox{ si } T_f \leq T \\
+    T + tp & \mbox{si } T_f > T \\
+  \end{array}
+\right.
+$$
+
+Le calcul explicite de $\mathbb{E}[T_r]$ est complexe. On passe donc par la simulation
+pour trouver la valeur de $\mathbb{E}[T_r]$ pour chaque composants.
+
+#### Création d'une fonction de simulation pour $\mathbb{E}[T_r]$
+
+Je propose de créer une fonction `simulation_esp_Tr`
+qui peut simuler $\mathbb{E}[T_r]$ en fonction :
+- du composant étudié
+- des paramètres du système
+
+Attention aux unités utilisées. Nos informations utiles sont stockées dans les
+structures :
+- `estim_param_duree_remplacement` pour les paramètres des durées de remplacement, en heures ou minutes.
+- `estim_max_likelihood` pour les lois de durées de vie.
+
+```{r}
+# paramètres au format
+# param = list(alpha = X, beta = X, lambda = X, T = X, tp = X)
+simulation_esp_Tr <- function(param, p = 1000) { 
+  # MTTF du composant
+  esp_Tf <- param$alpha * gamma(1 + 1/param$beta)
+  # Durée moyenne de remplacement périodique du composant
+  esp_D <- 1/param$lambda
+  
+  # Routine pour calculer par simulation l'espérance de la date de remise en
+  # service E[Tr]
+  # Simuler une trajectoire revient à simuler le système et récupérer la date
+  # de remise en service Tr
+  # Pour obtenir la moyenne, on recommence le processus un grand nombre de fois et
+  # on prend la moyenne
+
+  # contient les trajectoires du système.
+  list_traj <- c()
+  for (i in 1:p) {
+      # simule une date de panne aléatoire
+      Tf <- rweibull(1, shape = param$beta, scale = param$alpha)
+      # simule un temps de réparation corrective aléatoire
+      D <- rexp(1, rate = param$lambda)
+      if (Tf <= T) {
+          # Dans ce cas maintenance corrective
+          list_traj <- c(list_traj, Tf + D)
+      } else {
+          # Dans ce cas maintenance préventive
+          list_traj <- c(list_traj, T + param$tp)
+      }
+  }
+  
+  return(mean(list_traj))
+}
+```
+
+On peut tester notre fonction pour le composant E et un $T = 200h$.
+
+```{r}
+parametres = list(
+  alpha = estim_max_likelihood[estim_max_likelihood$Repère == "E",]$Alpha_h,
+  beta = estim_max_likelihood[estim_max_likelihood$Repère == "E",]$Beta,
+  lambda = estim_param_duree_remplacement[estim_param_duree_remplacement$Repère == "E",]$lambda_h,
+  tp = 10 / 60, # en heures
+  T = 200 # en heures
+)
+simulation_esp_Tr(parametres, p = 10000)
+```
+
+#### Détermination du coût cumulé jusqu'à la remise en service
+
+Pour obtenir cette information, on va procéder de la même facon que pour la loi de
+remise en service.
+
+Le coût cumulé de maintenance à la remise en service, noté $CC_r$ est une variable
+aléatoire dépendant du type de maintenance. Elle est composée :
+
+- du coût de remplacement fixe : $cc = 30€$.
+- du coût d'inactivité : $ci = 20€%min$.
+
+On peut alors écrire : $CC_r = cc + \mbox{Temps à l'arrêt en minutes } * ci$.
+
+Si la maintenance est corrective (donc si $T_f < T$) alors on a :
+$\mbox{Temps à l'arrêt en minutes } = D$ qui dépend du type de composant considéré.
+Dans ce cas si $T_f < T$ alors $CC_r = cc + D \cdot ci = 30 + 20D (€)$
+
+Si la maintenance est préventive (donc si $T_f > T$) alors on a :
+$\mbox{Temps à l'arrêt en minutes } = tp = 10 minutes$.
+Dans ce cas si $T_f > T$ alors $CC_r = cc + tp \times ci = 30 + 10 \times 20 = 230€$
+
+$$
+CC_r = \left\{
+  \begin{array}{ll}
+    cc + D \cdot ci & \mbox{si } T_f \leq T \\
+    cc + tp \cdot ci & \mbox{si } T_f > T \\
+  \end{array}
+\right.
+$$
+
+Comme $T_f$ et $D$ sont deux variables indépendantes
+on peut alors calculer facilement l'espérance du coût de maintenance total pour $T$ :
+
+$$
+\mathbb{E}[CC_r(T)]=  F_{\mathbf{W}(\alpha_{\omega},\beta_{\omega})}(T)
+\cdot (cc + \mathbb{E}[D] \cdot ci) +
+(1-F_{\mathbf{W}(\alpha_{\omega},\beta_{\omega})}(T)) \cdot (cc + tp \cdot ci)
+$$
+
+Le coût final à $T_r$ ne dépend donc que de $T$ en moyenne. 
+
+#### Création d'une fonction de simulation pour $\mathbb{E}[CC_r]$
+
+On peut à la fois utiliser la formule littérale ou une simulation pour calculer
+ce coût pour en fonction des paramètres du systèmes (composant ou $T$).
+
+```{r}
+# param = list(alpha = X, beta = X, lambda = X, T = X, tp = X,
+# cc = X, ci = X, tp = X)
+calcul_esp_CCr <- function(param) {
+  esp_D <- 1/param$lambda
+  FT <- pweibull(param$T, shape = param$beta, scale = param$alpha)
+  return(
+    FT * (param$cc + esp_D * param$ci) + (1-FT) * (param$cc + param$tp * param$ci)
+  )
+}
+
+simulation_esp_CCr <- function(param, p = 1000) {
+  
+  # Routine pour calculer par simulation l'espérance du coût à date de remise
+  # en service E[CCr]
+  # Simuler une trajectoire revient à simuler le système et récupérer le coût total
+  # à date de remplacement
+  # Pour obtenir la moyenne, on recommence le processus un grand nombre
+  # de fois et on prend la moyenne
+  
+  # contient les trajectoires du système.
+  list_traj <- c()
+  for (i in 1:p) {
+      # Simule une date de panne
+      Tf <- rweibull(1, shape = param$beta, scale = param$alpha)
+      # Simule une durée de réparation
+      D <- rexp(1, rate = param$lambda)
+      if (Tf <= param$T) {
+          # Maintenance corrective
+          list_traj <- c(list_traj, param$cc + D * param$ci)
+      } else {
+          # Maintenance préventive
+          list_traj <- c(list_traj, param$cc + param$tp * param$ci)
+      }
+  }
+  return(mean(list_traj))
+}
+```
+
+On peut tester ces deux méthodes :
+
+```{r}
+parametres = list(
+  alpha = estim_max_likelihood[estim_max_likelihood$Repère == "E",]$Alpha_h,
+  beta = estim_max_likelihood[estim_max_likelihood$Repère == "E",]$Beta,
+  lambda = estim_param_duree_remplacement[
+    estim_param_duree_remplacement$Repère == "E",
+  ]$lambda_h,
+  tp = 10 / 60, # en heures
+  T = 200, # en heures
+  # Temps de remplacement périodique en heures
+  tp = 10 / 60,
+  # coût de changement fixe
+  cc = 30,
+  # coût d'indisponibilité par heures
+  ci = 20 * 60
+)
+
+calcul_esp_CCr(param = parametres)
+simulation_esp_CCr(param = parametres, p = 50000)
+```
+
+#### Évaluation de l'espérance du coût moyen par unité de temps de la maintenance
+
+Nous disposons à présent de tous les éléments pour calculer le coût moyen par
+unité de temps en fonction des paramètres (T, composant) du système :
+
+$$
+\mbox{Coût moyen par unité de temps de la maintenance} = \mathbb{E}[CUT(T)] =
+\frac{\mathbb{E}[CC_r(T)]}
+{\mathbb{E}[T_r(T)]}
+$$
+
+On peut écrire une fonction qui effectue le calcul, cependant on ne peut pas
+juste de contenter de réutiliser les fonctions crées précédemment.
+
+En effet, le calcul de $\frac{\mathbb{E}[CC_r]$ et de $\mathbb{E}[T_r]$ doit se
+faire sur les mêmes tirages alétoires.
+
+Si l'on se contente de faire le quotient des deux fonction, le résultat final
+n'aurait pas de sens puisque l'on comparerai de grandeurs calculées à
+partir de données différentes.
+
+Cependant, avec un très grand nombre de simulation, les deux méthodes doivent
+converger.
+
+```{r}
+# param = list(alpha = X, beta = X, lambda = X, T = X, tp = X,
+# cc = X, ci = X, tp = X)
+simulation_esp_cut <- function(param, p = 1000) {
+  
+  # Routine pour calculer par simulation l'espérance du coût à date de remise en
+  # service E[CCr]
+  # Simuler une trajectoire revient à simuler le système et récupérer le coût
+  # total à date de remplacement
+  # Pour obtenir la moyenne, on recommence le processus un grand nombre de fois
+  # et on prend la moyenne
+  
+  # contient les trajectoires du système.
+  list_traj <- list(temps = c(), cout = c())
+  for (i in 1:p) {
+      # Simule une date de panne
+      Tf <- rweibull(1, shape = param$beta, scale = param$alpha)
+      # Simule une durée de réparation
+      D <- rexp(1, rate = param$lambda)
+      if (Tf <= param$T) {
+          # Maintenance corrective
+          list_traj$temps = c(list_traj$temps, Tf + D)
+          list_traj$cout = c(list_traj$cout, param$cc + D * param$ci)
+      } else {
+          # Maintenance préventive
+          list_traj$temps = c(list_traj$temps, param$T + param$tp)
+          list_traj$cout = c(list_traj$cout,
+                             param$cc + param$tp * param$ci)
+      }
+  }
+  
+  return(mean(list_traj$cout)/mean(list_traj$temps))
+}
+```
+
+Si on regarde pour le composant E :
+```{r}
+parametres = list(
+  alpha = estim_max_likelihood[estim_max_likelihood$Repère == "E",]$Alpha_h,
+  beta = estim_max_likelihood[estim_max_likelihood$Repère == "E",]$Beta,
+  lambda = estim_param_duree_remplacement[
+    estim_param_duree_remplacement$Repère == "E",
+  ]$lambda_h,
+  tp = 10 / 60, # en heures
+  T = 150, # en heures
+  # Temps de remplacement périodique en heures
+  tp = 10 / 60,
+  # coût de changement fixe
+  cc = 30,
+  # coût d'indisponibilité par heures
+  ci = 20 * 60
+)
+
+simulation_esp_cut(param = parametres, p = 5000)
+```
+
+Pour le composant E, pour ces paramètres de simulation : $T = 150$ on obtient
+un coût de $3.408627€.h^{-1}$.
+
+On a donc crée des fonctions permettant d'évaluer, pour un composant donné, une
+politique de maintenance.
+
+On peut à présent chercher une méthode pour déterminer la période
+d'inspection $T^*_\omega$ pour chaque composant $\omega$.
+
+### Optimisation de la politique de maintenance pour le composant E
+
+Je propose de passer par une recherche graphique de l'optimum $T^*_\omega$.
+
+Cette méthode consiste à tracer l'évolution de $\mathbb{E}[CUT(T)]$ en fonction
+de $T$ et d'identifier graphiquement le minimum.
+
+```{r}
+# Fonction qui va afficher le graphique de l'évolution de E[CUT(T)] en fonction
+# de T
+# Prend trois arguments :
+# - un vecteur T_set : une subdivision des valeurs de T
+# - les paramètres, au format identiques aux précédents
+# - un nombre de réplication.
+
+afficher_variation_cut <- function(T_set, param, p = 1000) {
+	
+	# vecteur stockant les valeurs successives de E[CUT(T)]
+	res_list <- c()
+	
+	for (t in T_set) {
+		# met à jour les paramètres en fonction de T étudié
+		param$T <- t
+		res_list <- c(res_list, simulation_esp_cut(param, p))
+	}
+	
+	ggplot() +
+		geom_line(aes(x = T_set, y = res_list)) +
+		labs(x = "T", y = "E[CUT(T)]",
+			 title = "Variation du coût moyen par unité de temps (CUT) en
+         fonction de la période de remplacement périodique T") +
+		custom_theme
+}
+```
+
+On teste le résultat de cette fonction pour le composant E
+```{r}
+afficher_variation_cut(seq(1,500,10), parametres, p = 1000)
+```
+
+Il semble que le $T$ optimal pour le composant E, notons le $T^*_E$ est
+proche de $T = 100$.
+
+On va ensuite effectuer un raffinement successif de intervalle étudié jusqu'à
+trouver une valeur de $T^*_E$ suffisamment précise.
+
+```{r}
+afficher_variation_cut(seq(50,200,10), parametres, p = 5000)
+```
+
+```{r}
+afficher_variation_cut(seq(75,150,1), parametres, p = 5000)
+```
+
+On peut augmenter le nombre de réplication pour réduire l'incertitude liée
+à la simulation.
+
+```{r}
+afficher_variation_cut(seq(90,120,1), parametres, p = 10000)
+```
+
+```{r}
+afficher_variation_cut(seq(100,120,1), parametres, p = 10000)
+```
+
+```{r}
+afficher_variation_cut(seq(110,130,1), parametres, p = 10000)
+```
+
+On peut essayer de doubler le nombre de réplications en réduisant le pas pour $T$ :
+
+```{r}
+afficher_variation_cut(seq(110,120,0.1), parametres, p = 10000)
+```
+
+En l'état, il semble difficile d'améliorer le résultat.
+
+Il semble donc que la période optimale pour le composant E se trouve
+entre $T = 110$ et $T = 120$, avec un coût unitaire moyen proche de $3€/h$.
+
+Avec cette politique de maintenance, on va dépenser :
+- $3€/h$
+- $72€/j$
+- $504€/semaines$
+- $26280€/ans$
+environ, avec une période de $T^*_E \simeq [110;120]$
+
+On peut donc effectuer ce travail de recherche pour tous les composants.
+
+### Optimisation de la politique de maintenance pour le composant D
+
+Il serait possible d'automatiser le processus précédent pour l'appliquer à tous
+les composants du robot (voir Annexe 4).
+
+Cependant, nous utilisons cette politique de maintenance uniquement pour les 
+composants de la classe A, nous devons donc identifier la période $T^*_D$.
+
+```{r}
+parametres = list(
+  alpha = estim_max_likelihood[estim_max_likelihood$Repère == "D",]$Alpha_h,
+  beta = estim_max_likelihood[estim_max_likelihood$Repère == "D",]$Beta,
+  lambda = estim_param_duree_remplacement[
+    estim_param_duree_remplacement$Repère == "D",
+  ]$lambda_h,
+  tp = 10 / 60, # en heures
+  T = 150, # en heures
+  # Temps de remplacement périodique en heures
+  tp = 10 / 60,
+  # coût de changement fixe
+  cc = 30,
+  # coût d'indisponibilité par heures
+  ci = 20 * 60
+)
+```
+
+```{r}
+afficher_variation_cut(seq(50,500,10), parametres, p = 10000)
+```
+
+```{r}
+afficher_variation_cut(seq(100,200,1), parametres, p = 5000)
+```
+```{r}
+afficher_variation_cut(seq(100,160,1), parametres, p = 10000)
+```
+
+Dans ce cas, le minimum est moins évident à trouver visuellement. Il semble se
+situer entre 120h et 140h pour un coût annuel de $4.55€.h^{-1}$.
+
+### Conclusion
+
+Nous avons donc touvé une politique de maintenance adaptée pour les composants
+E et D de la classe A, prioritaire.
+
+|Composant|T optimal|Coût moyen estimé par heures|
+|E|$110h \sim 120h$|$3€/h$|
+|D|$120h \sim 140h$|$4.55€/h$|
+
+On peut facilement envisager une politique commune, visant à effectuer toutes
+les maintenances préventives de tous les composants de la classe A.
+
+

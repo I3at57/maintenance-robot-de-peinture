@@ -1,0 +1,395 @@
+## Estimation des durées de vie de chaque élément.
+
+On cherche à présent à définir la durée de vie de chaque élément du robot. Cette
+information sera utile pour ensuite pour créer un modèle permettant l'optimisation
+de la politique de maintenance.
+
+### Modèle mathématique
+
+On suppose que la durée de bon fonctionnement avant la panne de chaque composant
+$\omega$, avec $\omega \in [A,B,D,E,F,G,H,I,J]$ est une variable aléatoire
+notée $T_{\omega}$ à valeur dans $\mathbb{R}_+^*$.
+
+On suppose que les $T_{\omega}$ suivent une loi de Weibull de paramètre d'échelle
+$\alpha$ et de forme $\beta$.
+On note alors $T_{\omega} \sim \mathbf{W}(\alpha_{\omega},\beta_{\omega})$.
+
+On cherche alors a estimer les paramètres $(\alpha_{\omega},\beta_{\omega})$,
+pour avoir une idée plus précise du comportement des composants.
+
+### Méthode d'estimation par maximum de vraissemblance
+
+Wikipédia définit [la vraisemblance](https://fr.wikipedia.org/wiki/Fonction_de_vraisemblance) comme :
+"fonction des paramètres d'un modèle statistique calculée à partir de données observées".
+
+Sous l'hypothèse d'un modèle connu, la fonction de vraisemblance (notée
+$L$ permet de 
+calculer la probabilité d'obtenir une un tirage précis d'observation. C'est
+en somme la probabilité d'obtenir ce résultat précis de tirage en supposant un
+modèle précis.
+
+On note la vraisemblance $L(\vec{\theta},\vec{x})$, avec $\vec{\theta}$ les paramètre de notre modèle et $\vec{\mathbb{x}}$ le vecteur des observations
+issues de $n$ variables aléatoires $X_i$
+
+On a lors :
+$L(\vec{\theta},\vec{x})=\prod_{i=1}^{n}f_i(\vec{\theta},x_i)$.
+
+L'estimation par maximum de vraisemblance, revient à chercher, pour un jeu
+d'observation donné $\vec{x}$, les paramètres $\vec{\theta}^*$ qui maximisent
+la fonction de vraisemblance.
+
+Cela revient à chercher : avec les observations obtenues, quels sont les valeurs
+prises par mon modèle les plus "vraisemblables".
+
+La maximisation passe par l'annulation dérivée (ou les dérivées partielles) suivant les paramètres.
+
+### Application au cas de la loi de Weibull
+
+On se place dans un cas de maintenance parfaite (chaque maintenance remet à neuf
+le système en remplaçant les composants) suivant une loi de Weibull.
+
+Pour rappel la loi de Weibull possède la densité suivante :
+$$
+f_i(\alpha,\beta,x_i) = \left( \frac{\beta}{\alpha} \right)
+\left( \frac{x_i}{\alpha} \right)^{\beta-1}
+e^{-\left( \frac{x_i}{\alpha}\right)^{\beta}}
+$$
+
+Le calcul de la vraisemblance est donc relativement complexe. Si l'on souhaite une
+solution analytique au problème, il est préférable de passer la log-vraissemblance.
+
+En effet, la fonction logarithme étant croissante, maximiser la log-vraissemblance
+revient à maximiser la vraisemblance.
+
+Après un développement, on obtient alors le système :
+
+$$
+\left\{
+  \begin{array}{ll}
+    \alpha^*= \left( \frac{1}{n}\sum_{i=1}^{n}x_i^{\beta^*}\right)^{\frac{1}{\beta^*}} \\
+    \frac{1}{\beta^*}\frac{\sum_{i=1}^{n}ln(x_i)}{n}-
+    \frac{\sum_{i=1}^{n}x_i^{\beta^*}ln(x_i)}{\sum_{i=1}^{n}x_i^{\beta^*}}=0
+  \end{array}
+\right.
+$$
+que l'on doit résoudre pour obtenir $\beta^*$ et $\alpha^*$ qui sont alors les
+estimateurs du maximum de vraisemblance que l'on notera $\hat{\alpha}_{MV}$ et
+$\hat{\beta}_{MV}$.
+
+Plusieurs solutions existent pour obtenir ses estimateurs sans passer par la résolution
+de ce système.
+
+### Construction des données
+
+Pour estimer les paramètres des lois, on utilise les données d'analyse de durées
+de défaillance entre deux pannes (en heures).
+
+```{r}
+durees_inter_panne <- list(
+    A = c(100,150,30,45,170,195,200,250,340,60),
+    B = c(250,400,430,670,1000,1500,1200,1050,480),
+    D = c(55,40,70,120,150,270,200,190),
+    E = c(110,208,170,190,155,230,340,150,160,195,280,250),
+    F = c(45,60,72,68,95,12,18,40,49),
+    I = c(111,70,50,60,80,904,100,75,67,71,110),
+    J = c(130,150,117,200,180,155,140,130,81,75)
+)
+```
+
+Ici la liste `durees_inter_panne` contient les durées inter-panne en heure. Cependant, nous avions stocké les temps d'arrêt
+
+### Estimations
+
+#### Utilisation de `nlm`
+
+La fonction `nlm` permet de minimiser une fonction dans R suivant un jeu de
+paramètre.
+
+On peut alors utiliser cette fonction pour minimiser la fonction -log-vraisemblance,
+ce qui revient à maximiser la vraisemblance.
+
+La log-vraisemblance dans le cas d'un loi de Weibull s'écrit :
+
+$$
+lnL(\alpha,\beta,\vec{x}) = nln(\beta)-n\beta ln(\alpha)+(\beta-1)\sum_{i=1}^{n}ln(x_i)
+-\frac{1}{\alpha^{\beta}}\sum_{i=1}^{n}(x_i)^{\beta}
+$$
+
+Donc on va minimiser la fonction :
+
+$$
+-lnL(\alpha,\beta,\vec{x}) = -nln(\beta)+n\beta ln(\alpha)-(\beta-1)\sum_{i=1}^{n}ln(x_i)
++\frac{1}{\alpha^{\beta}}\sum_{i=1}^{n}(x_i)^{\beta}
+$$
+
+```{r}
+neg_log_likelihood <- function(param, xi) {
+    
+    # la fonction nlm ne prenant qu'un seul paramètre : les paramètres d'optimisation,
+    # il faut donc utiliser un tableau 'param' dans lequel :
+    # param[1] = alpha
+    # param[2] = beta
+    
+    n <- length(xi)
+    
+    -n * log(param[2]) +
+        n * param[2] * log(param[1]) -
+        (param[2]-1) * sum(log(xi)) +
+        (1/(param[1]^(param[2]))) * sum((xi)^param[2]) %>%
+        return()
+        
+}
+```
+
+```{r message=FALSE, warning=FALSE}
+estim_max_likelihood <- c()
+for (xi in durees_inter_panne) {
+    ans <- nlm(f = neg_log_likelihood, p = c(1,1), xi)
+    # print(ans$estimate)
+    estim_max_likelihood <- c(estim_max_likelihood, ans$estimate)
+}
+
+estim_max_likelihood <- tibble::as_data_frame(
+    matrix(estim_max_likelihood, ncol = 2, byrow = TRUE)
+)
+estim_max_likelihood$Repère <- c("A", "B", "D", "E", "F", "I", "J")
+colnames(estim_max_likelihood) <- c("Alpha", "Beta", "Repère")
+estim_max_likelihood
+```
+
+La fonction `neg_log_likelihood` calcul la -log-vraisemblance tel que décrite dans
+l'équation plus haut. Cependant il tout à fait possible d'optimiser avec la fonction
+`nlm` en partant d'une écrite plus simple de la fonction :
+
+$$
+-lnL(\alpha,\beta,\vec{x}) = \sum_{i=1}^{n}ln(f_i(\alpha,\beta,x_i))
+$$
+
+```{r warning=FALSE}
+LL_Wei <- function(param, xi) {
+    vec <- dweibull(xi, scale = param[1], shape = param[2])
+    -sum(log(vec)) %>% return()
+}
+for (xi in durees_inter_panne) {
+    print(nlm(LL_Wei,c(mean(xi),1),xi)$estimate)
+}
+```
+
+On a donc pour chaque composant du robot, l'estimations des paramètres de la
+durée de vie suivant une loi de Weibull.
+
+#### Fonction `eweibull`
+
+Cette fonction du package `EnvStats` effectue l'estimation des paramètre d'une
+loi de Weibull suivant la méthode du maximum de vraisemblance directement à partir
+des données
+
+```{r message=FALSE}
+library(EnvStats)
+ewebull_estim <- c()
+for (xi in durees_inter_panne) {
+    ewebull_estim <- c(ewebull_estim, eweibull(xi, method = "mle")$parameters)
+}
+ewebull_estim <- tibble::as_data_frame(
+    matrix(ewebull_estim, ncol = 2, byrow = TRUE)
+)
+ewebull_estim$Repère <- c("A", "B", "D", "E", "F", "I", "J")
+colnames(ewebull_estim) <- c("Beta", "Alpha", "Repère")
+ewebull_estim
+```
+
+```{r}
+ewebull_estim
+estim_max_likelihood
+```
+
+Malgré de très légères différences, les deux solutions permettent d’obtenir les
+mêmes estimateurs.
+
+Je décide de conserver les résultat obtenus à l'aide de la première méthode contenus
+dans le vecteur `estim_max_likelihood`.
+
+```{r}
+# Place la colonne Repère en premier dans on dataframe
+estim_max_likelihood <- estim_max_likelihood %>% relocate(Repère)
+```
+
+On peut ensuite tracer les densités associées et donner le $MTTF$ pour mieux
+se représenter les comportement des composants.
+
+```{r}
+composants <- c("Electrovanne pistolet",
+                "Vérins ",
+                "Bras horizontal - Poignets de programmation",
+                "Nez robot",
+                "Fin de course support bras",
+                "Carte DH",
+                "Carte Servo")
+reperes <- y_set
+
+t_div <- seq(0,1000,1)
+
+ggplot() +
+    geom_line(aes(x = t_div,
+                  y = dweibull(t_div,
+                               scale = ewebull_estim$Alpha[1],
+                               shape = ewebull_estim$Beta[1]),
+              colour = "A")) +
+    geom_line(aes(x = t_div,
+                  y = dweibull(t_div,
+                               scale = ewebull_estim$Alpha[2],
+                               shape = ewebull_estim$Beta[2]),
+                  colour = "B")) +
+    geom_line(aes(x = t_div,
+                  y = dweibull(t_div,
+                               scale = ewebull_estim$Alpha[3],
+                               shape = ewebull_estim$Beta[3]),
+              colour = "D")) +
+    geom_line(aes(x = t_div,
+                  y = dweibull(t_div,
+                               scale = ewebull_estim$Alpha[4],
+                               shape = ewebull_estim$Beta[4]),
+              colour = "E")) +
+    geom_line(aes(x = t_div,
+                  y = dweibull(t_div,
+                               scale = ewebull_estim$Alpha[5],
+                               shape = ewebull_estim$Beta[5]),
+              colour = "F")) +
+    geom_line(aes(x = t_div,
+                  y = dweibull(t_div,
+                               scale = ewebull_estim$Alpha[6],
+                               shape = ewebull_estim$Beta[6]),
+                    colour = "I")) +
+    geom_line(aes(x = t_div,
+                  y = dweibull(t_div,
+                               scale = ewebull_estim$Alpha[7],
+                               shape = ewebull_estim$Beta[7]),
+                  colour = "J")) +
+    scale_color_manual(name = "Repères",
+                       values = c("A" = 'red',
+                                  "B" = "#FF9600",
+                                  "D" = 'yellow',
+                                  "E" = 'green',
+                                  "F" = 'magenta',
+                                  "I" = 'black',
+                                  "J" = 'brown')) +
+    labs(title = "Représentation des densités des lois de durées de vie
+         pour les différents composant du robot",
+         x = "t",
+         y = "f(t)") +
+    custom_theme
+```
+
+
+
+On peut ensuite calculer le $MTTF$. Pour une loi de Weibull, on a
+$E[X_i]=\alpha \Gamma (1+\frac{1}{\beta})$
+
+```{r}
+estim_max_likelihood$MTTF <- as.double(1:7)
+
+for (i in 1:7) {
+    estim_max_likelihood[i,'MTTF'] <- ewebull_estim$Alpha[i] *
+        gamma(1+1/ewebull_estim$Beta[i])
+}
+estim_max_likelihood
+```
+
+Toutes les valeurs manipulées sont en heures de fonctionnement.
+
+Je propose de les convertir en minutes.
+
+```{r}
+estim_max_likelihood <- estim_max_likelihood %>%
+  rename(Alpha_h = Alpha) %>%
+  rename(MTTF_h = MTTF) %>%
+  mutate(Alpha_m = Alpha_h * 60) %>%
+  mutate(MTTF_m = Alpha_m * gamma(1+1/Beta)) %>%
+  relocate(Alpha_m, .after = Alpha_h)
+estim_max_likelihood
+```
+
+
+## Estimation des distributions des durées de changement correctif pour chaque élément.
+
+Après avoir estimé les les paramètres des lois de Weibull des durées inter-panne
+(loi de durée de vie) des composants du robot, on va maintenant chercher
+à estimer les temps de remplacement pour chacun des ces derniers.
+
+On va exploiter, pour cela, les données issues du fichier de retour d'expérience.
+
+On peut réutiliser la même démarche que précédemment, en cherchant les estimateurs
+du maximum de vraisemblance. Cette fois, on suppose que les durées suivent des
+lois exponentielles. 
+
+Cette loi étant plus simple que la loi de Weibull, il est possible d'obtenir
+l'estimateur du maximum de vraisemblance analytiquement.
+
+$$
+\hat{\lambda}_{MV} = \frac{n}{\sum_{i=1}^{n}(x_i)}=\frac{1}{\hat{m}}
+$$
+
+Soit l'inverse de la moyenne empirique de l'échantillon mesurée $\hat{m}$.
+
+Les durée de temps d'arrêt stockée dans `df_abc_noNA` étant en minutes, je propse de les convertir en heures pour garder la cohérence
+avec les durée de fonctionnement estimées précédement.
+
+```{r}
+df_abc_noNA <- df_abc %>% 
+  mutate(temps_arret_h = temps_arret_min * (1/60))
+df_abc_noNA <- df_abc_noNA %>% relocate()
+df_abc_noNA
+```
+
+
+```{r}
+estim_mv_expo <- function(xi) {
+    1/mean(xi) %>% return()
+}
+# Effectue le calcul de l'inverse de la moyenne par repère
+estim_param_duree_remplacement <- aggregate(
+  temps_arret_h~Repère,
+  data = df_abc_noNA,
+  estim_mv_expo
+)
+estim_param_duree_remplacement <- estim_param_duree_remplacement %>% 
+  rename(lambda_h = temps_arret_h)
+estim_param_duree_remplacement
+```
+
+On peut ensuite calculer le temps moyen de remplacement :
+
+```{r}
+estim_param_duree_remplacement$temps_arret_moyen_h <- 1/estim_param_duree_remplacement$lambda_h
+estim_param_duree_remplacement$lambda_m <- estim_param_duree_remplacement$lambda_h / 60
+estim_param_duree_remplacement$temps_arret_moyen_m <- 1/estim_param_duree_remplacement$lambda_m
+estim_param_duree_remplacement
+```
+
+On a donc a présent pour les composants du robot :
+- un estimation de la durée de vie du composant (loi de Weibull et les paramètres associés)
+- une estimation du temps de remplacement du composant
+(temps d'immobilisation du robot engendré. Loi exponentielles et le paramètre associé).
+
+## Discussions des résultats
+
+Les résultats obtenus peuvent être critiqués et doivent être mit en perspective
+avec le contexte général de l'analyse.
+
+Premièrement, nous avons écarté deux défaillance de la classification de Pareto.
+
+Puisque que ces défaillances ne touchent pas directement une pièce du robot et qu'elles
+sont rare et peu impactant sur le temps d'arrêt (10 et 35 minutes), ces deux défaillances
+auraient été incluses dans la classe C.
+Nous n'aurions donc dans tous les cas pas concentrer nos efforts sur l'optimisation
+de la politique de maintenance de ces éléments.
+
+Pour les estimations effectués, plusieurs éléments doivent être prit en compte :
+
+- nous avons supposé les lois de probabilité (Weibull et Exponentielle) sans pour autant
+avoir testé l'adéquation de ces lois aux données.
+- nous disposons de très peu de donnée en général (parfois une seule panne référencée
+pour certain composants).
+
+Les résultats obtenus permettent donc une première analyses, mais devraient être
+améliorés si nous avions l'opportunité de récupérer plus de mesures.

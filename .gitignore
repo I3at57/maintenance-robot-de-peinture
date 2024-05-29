@@ -1,0 +1,5 @@
+*.log
+.Rhistory
+
+*_files
+*_caches
