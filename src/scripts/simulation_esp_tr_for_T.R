@@ -54,9 +54,9 @@ for (t in sec_T) {
 ggplot() +
 	geom_line(aes(x = sec_T, y = res_A, color = "Par simulation")) +
 	geom_line(aes(x = sec_T, y = res_B, color = "Analytique")) +
-	# geom_line(aes(x = sec_T, y = sec_T)) +
-	# ylim(0,300) +
-	# xlim(0,200) +
+	geom_line(aes(x = sec_T, y = sec_T)) +
+	ylim(0,300) +
+	xlim(0,300) +
 	labs(x = "Valeur T : temps avant inspection",
 		 y = "Espérance de Tr",
 		 title = "Comparaison de l'évolution de l'espérance de Tr en fonction

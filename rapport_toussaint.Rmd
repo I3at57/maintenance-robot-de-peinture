@@ -65,3 +65,6 @@ df %>% head()
 
 ```
 
+```{r child = './src/parts/optimisation_classe_A.Rmd}
+
+```
