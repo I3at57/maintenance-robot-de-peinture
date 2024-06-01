@@ -159,6 +159,11 @@ ggplot(mapping = aes(x = 0:9, y = 100*y_set/temps_arret_total))+
              label = paste(
                  round(100*y_set[3]/temps_arret_total),"%"),
              color = 'red') +
+	geom_vline(xintercept = 2, color = 'black') +
+	annotate(geom = "text",
+			 x = 2+0.4,
+			 y = 10,
+			 label = paste(round((2/9)*100),"%")) +
     geom_area(aes(x = 0:2, y = 100*y_set[3]/temps_arret_total),
               fill = 'red',
               alpha = 0.4,
@@ -171,6 +176,11 @@ ggplot(mapping = aes(x = 0:9, y = 100*y_set/temps_arret_total))+
              label = paste(
                  round(100*y_set[5]/temps_arret_total),"%"),
              color = 'orange') +
+	geom_vline(xintercept = 4, color = 'black') +
+	annotate(geom = "text",
+			 x = 4+0.4,
+			 y = 10,
+			 label = paste(round((4/9)*100),"%")) +
     geom_area(aes(x = 2:4, y = 100*y_set[5]/temps_arret_total),
               fill = 'orange',
               alpha = 0.4,
@@ -188,14 +198,115 @@ ggplot(mapping = aes(x = 0:9, y = 100*y_set/temps_arret_total))+
     custom_theme
 ```
 
-Sur le graphique on peut alors observer que les défaillances liées aux repères E et D (la classe A),
-soit le "Nez robot" et la "Poignées de programmation" représentent à elles
-seules 74% du coût d'immobilisation (puisque ces défaillances représentent
-74% du temps d'immobilisation total).
+Cette premièr manière de classifier les éléments est cohérente si l'on observe
+les données :
 
-La classe B représente 18% du coût total d'immobilisation.
+```{r}
+somme_temps_arret_par_repere
+```
 
-Les autres défaillances (classe C) représentent donc 8% du temps total
-d'immobilisation.
+On voit bien qu'il y a un changement de comportement visible entre le composant D et
+le composant A, de même qu'entre le composant F et le composant I (on passe de 530 à
+185 puis de 160 à 94).
 
-La priorité devra donc être mise sur la politique de maintenance des composants des classes A et B (les repères E, D, A, F).
+Cependant, cette méthode colle assez peu à la "philosophie" de la classification
+ABC. En effet, notre classe A représente bien environ 20% des données mais seulement
+74% des effets.
+
+On peut aussi décider d'inclure le composant A dans la classe A et le composant
+I à la classe B, ce qui donne :
+
+```{r}
+ggplot(mapping = aes(x = 0:9, y = 100*y_set/temps_arret_total))+
+    geom_line() +
+    ylim(c(0,100)) +
+    scale_x_continuous(breaks = 0:9,
+                     labels = x_set) + 
+    labs(x = "Repère de défaillance",
+         y = "% coût cumulé en €",
+         title = "% du coût d'immobilisation cumulé en € des différents repère de défaillance
+         classés par ordre croisant") +
+    geom_hline(yintercept = 100*y_set[4]/temps_arret_total,
+               color = 'red') +
+    annotate(geom = "text",
+             x = 0,
+             y = 100*y_set[4]/temps_arret_total+5,
+             label = paste(
+                 round(100*y_set[4]/temps_arret_total),"%"),
+             color = 'red') +
+	geom_vline(xintercept = 3, color = 'black') +
+	annotate(geom = "text",
+			 x = 3+0.4,
+			 y = 10,
+			 label = paste(round((3/9)*100),"%")) +
+    geom_area(aes(x = 0:3, y = 100*y_set[4]/temps_arret_total),
+              fill = 'red',
+              alpha = 0.4,
+              color = 'red') +
+    geom_hline(yintercept = 100*y_set[6]/temps_arret_total,
+               color = 'orange') +
+    annotate(geom = "text",
+             x = 1,
+             y = 100*y_set[6]/temps_arret_total-5,
+             label = paste(
+                 round(100*y_set[6]/temps_arret_total),"%"),
+             color = 'orange') +
+	geom_vline(xintercept = 5, color = 'black') +
+	annotate(geom = "text",
+			 x = 5+0.4,
+			 y = 10,
+			 label = paste(round((5/9)*100),"%")) +
+    geom_area(aes(x = 3:5, y = 100*y_set[6]/temps_arret_total),
+              fill = 'orange',
+              alpha = 0.4,
+              color = 'orange') +
+    geom_area(aes(x = 5:9, y = 100),
+              fill = 'green',
+              alpha = 0.4,
+              color = 'green') +
+    annotate(geom = "text", x = 1.75, y = 25, label = "E, D, A", color = 'red',
+             size = 10) +
+    annotate(geom = "text", x = 4, y = 50, label = "F, I", color = 'orange',
+             size = 10) +
+    annotate(geom = "text", x = 7, y = 60, label = "H, B, G, J", color = 'limegreen',
+             size = 10) +
+    custom_theme
+```
+
+Pour trancher entre les deux méthodes, je propose de réexploiter la méthode présentée
+par Pr. Amodeo dans l'UE GP27 : gestion des stocks.
+
+![Choix des pourcentage pour la méthode ABC avec calcul du ratio](./img/methode_ABC.png)
+Dans cette méthode, on définit le pourcentage d'élements présents dans chaque classe
+en fonction du calcul d'un ratio qui peut se déduire graphiquement par le point
+d'intersection entre la droite d'équation : $y = 100-\frac{100}{\mbox{Nombre d'éléments considérés}}x$ et la courbe.
+
+On utilise ensuite le tableau pour déduire les pourcentages déléments présents dans
+chaque classe en fonction de ce ratio $RD$.
+
+```{r}
+# ggplot permet de créer de plus jolis graphiques et est facilement
+# utilisable pour un résultat proche de ce que l'on souhaite avoir
+ggplot(mapping = aes(x = 0:9, y = y_set*100/max(y_set)))+
+    geom_line() +
+	geom_line(aes(x = 0:9, y = -(100/9)*(0:9)+100)) +
+    scale_x_continuous(breaks = 0:9,
+                     labels = x_set) + 
+    labs(x = "Repère de défaillance",
+         y = "Temps cumulé en min",
+         title = "Temps cumulé en min des différents repère de défaillance
+         classés par ordre décroisant issu du REX") +
+    custom_theme
+```
+
+Par lecture graphique on en conclut que $0.85 > RD > 0.75$. Si l'on reprend le tableau
+présenté plus haut, on en conclut que :
+- la classe A doit représenter 20 % des éléments
+- la classe B doit représenter 20% des éléments
+- la classe C doit représenter 60% des éléments
+
+Ce résultat conforte la première classification proposée avec :
+
+- classe A : E & D (22% des éléments)
+- classe B : A & F (22% des éléments)
+- classe C : le reste (56% des éléments)

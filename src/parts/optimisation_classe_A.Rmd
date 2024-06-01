@@ -140,6 +140,9 @@ T_r = \left\{
 \right.
 $$
 
+Ce résultat suppose que ma maintenance est auto-détectable ce qui colle avec la
+politique de maintenance demandée par le client.
+
 Le calcul explicite de $\mathbb{E}[T_r]$ est complexe. On passe donc par la simulation
 pour trouver la valeur de $\mathbb{E}[T_r]$ pour chaque composants.
 
@@ -427,12 +430,13 @@ afficher_variation_cut <- function(T_set, param, p = 1000) {
 		res_list <- c(res_list, simulation_esp_cut(param, p))
 	}
 	
-	ggplot() +
+	p<- ggplot() +
 		geom_line(aes(x = T_set, y = res_list)) +
 		labs(x = "T", y = "E[CUT(T)]",
 			 title = "Variation du coût moyen par unité de temps (CUT) en
          fonction de la période de remplacement périodique T") +
 		custom_theme
+	return(p)
 }
 ```
 
@@ -451,18 +455,18 @@ trouver une valeur de $T^*_E$ suffisamment précise.
 afficher_variation_cut(seq(50,200,10), parametres, p = 5000)
 ```
 
-```{r}
+```{r eval=FALSE, include=FALSE}
 afficher_variation_cut(seq(75,150,1), parametres, p = 5000)
 ```
 
 On peut augmenter le nombre de réplication pour réduire l'incertitude liée
 à la simulation.
 
-```{r}
+```{r eval=FALSE, include=FALSE}
 afficher_variation_cut(seq(90,120,1), parametres, p = 10000)
 ```
 
-```{r}
+```{r eval=FALSE, include=FALSE}
 afficher_variation_cut(seq(100,120,1), parametres, p = 10000)
 ```
 
@@ -490,15 +494,110 @@ environ, avec une période de $T^*_E \simeq [110;120]$
 
 On peut donc effectuer ce travail de recherche pour tous les composants.
 
-### Optimisation de la politique de maintenance pour le composant D
+### Optimisation de la recherche
 
-Il serait possible d'automatiser le processus précédent pour l'appliquer à tous
-les composants du robot (voir Annexe 4).
-
-Cependant, nous utilisons cette politique de maintenance uniquement pour les 
-composants de la classe A, nous devons donc identifier la période $T^*_D$.
+Cette méthode graphique prend un temps important. Pour optimiser la recherche,  je
+propose d'écrire un script qui calcul le minimum pour les composants de la classe
+A.
 
 ```{r}
+repere <- c("E", "D")
+t_opti <- c()
+cut_opti <- c()
+for (w in repere) {
+	
+	# Les paramètres
+	alpha = estim_max_likelihood[estim_max_likelihood$Repère == w,]$Alpha_h
+	beta = estim_max_likelihood[estim_max_likelihood$Repère == w,]$Beta
+	lambda = estim_param_duree_remplacement[
+		estim_param_duree_remplacement$Repère == w,
+	]$lambda_h
+	tp = 10 / 60 # en heures
+	T = 0 # en heures
+	# Temps de remplacement périodique en heures
+	tp = 10 / 60
+	# coût de changement fixe
+	cc = 30
+	# coût d'indisponibilité par heures
+	ci = 20 * 60
+	
+	# nombre de simulation
+	p <- 20000
+	# intervalle de recherche du T optimal
+	T_set <- seq(50,400,1)
+	n <- length(T_set)
+	res_list <- c()
+	for (t in T_set) {
+		sumT <- 0
+		sumC <- 0
+		for (i in 1:p) {
+			Tf <- rweibull(1, shape = beta, scale = alpha)
+			D <- rexp(1, rate = lambda)
+			if (Tf <= t) {
+				# Maintenance corrective
+				sumT = sumT + Tf + D
+				sumC = sumC + cc + D * ci
+			} else {
+				# Maintenance préventive
+				sumT = sumT + t + tp
+				sumC = sumC + cc + tp * ci
+			}
+		}
+		# calcul du coût moyen par unité de temps
+		res_list <- append(res_list, sumC/sumT)
+	}
+	
+	# Calcul de la moyenne mobile
+	moyenne_mobile <- c()
+	for (i in 3:(n-2)) {
+		moyenne_mobile <- c(moyenne_mobile,
+							mean(res_list[seq(i-2,i+2,1)]))
+	}
+	
+	t_opti <- c(t_opti, T_set[which(moyenne_mobile == min(moyenne_mobile))])
+	cut_opti <- c(cut_opti, min(moyenne_mobile))
+}
+politique_maintenance <- tibble(repere,t_opti,cut_opti)
+politique_maintenance
+```
+
+Ce script va simuler une valeur de coût moyen par unité de temps pour plusieurs 
+valeurs de $T$, à partir de $p$ simulations.
+
+Le script calcul ensuite ensuite une moyenne mobile sur ces valeurs, ce qui permet
+de légèrement lisser sauts aléatoires dûs à la simulation.
+
+Elle sort ensuite la meilleure valeure trouvée pour $T^*_{\omega}$ et le coût
+moyen associé.
+
+On va donc mettre en place les politiques suivantes :
+- Composant E : $T^*_E = 104$ et $\mathbb{E}[CUT(T^*_E)] \simeq 2.980781 €.h^{-1}$
+contre un coût de $\mathbb{E}[CUT(\infty)] \simeq 7 €.h^{-1}$ si l'on
+ne fait que de la maintenance corrective. Celà représente une diminution de près
+de 57,12% des coûts liés au composant E.
+
+- Composant D : $T^*_D = 59$ et $\mathbb{E}[CUT(T^*_D)] \simeq 8.116167 €.h^{-1}$
+contre un coût de $\mathbb{E}[CUT(\infty)] \simeq 13 €.h^{-1}$ si l'on
+ne fait que de la maintenance corrective. Celà représente une division de près
+de 37.57% des coûts liés au composant E.
+
+```{r eval=FALSE, include=FALSE}
+parametres = list(
+  alpha = estim_max_likelihood[estim_max_likelihood$Repère == "E",]$Alpha_h,
+  beta = estim_max_likelihood[estim_max_likelihood$Repère == "E",]$Beta,
+  lambda = estim_param_duree_remplacement[
+    estim_param_duree_remplacement$Repère == "E",
+  ]$lambda_h,
+  tp = 10 / 60, # en heures
+  T = 150, # en heures
+  # Temps de remplacement périodique en heures
+  tp = 10 / 60,
+  # coût de changement fixe
+  cc = 30,
+  # coût d'indisponibilité par heures
+  ci = 20 * 60
+)
+afficher_variation_cut(seq(50,600,10), parametres, p = 10000)
 parametres = list(
   alpha = estim_max_likelihood[estim_max_likelihood$Repère == "D",]$Alpha_h,
   beta = estim_max_likelihood[estim_max_likelihood$Repère == "D",]$Beta,
@@ -514,32 +613,241 @@ parametres = list(
   # coût d'indisponibilité par heures
   ci = 20 * 60
 )
+afficher_variation_cut(seq(50,600,10), parametres, p = 10000)
+```
+
+Si l'on cumule les coûts de maintenance associé à E et à D, on obtient alors un
+coût de $11.09695 €.h^{-1}$.
+
+Si on cherche à regrouper les maintenances (pour simplifier l'organisation du service
+ou pour réduire d'éventuels coûts liés à la mobilisation du service de mainteance),
+on va alors prendre une période de remplacement périodique de $t1 = 60$ (on
+se permet d'arrondir 59h à 60h pour simplifier la mise en place).
+
+```{r}
+parametres = list(
+  alpha = estim_max_likelihood[estim_max_likelihood$Repère == "E",]$Alpha_h,
+  beta = estim_max_likelihood[estim_max_likelihood$Repère == "E",]$Beta,
+  lambda = estim_param_duree_remplacement[
+    estim_param_duree_remplacement$Repère == "E",
+  ]$lambda_h,
+  tp = 10 / 60, # en heures
+  T = 60, # en heures
+  # Temps de remplacement périodique en heures
+  tp = 10 / 60,
+  # coût de changement fixe
+  cc = 30,
+  # coût d'indisponibilité par heures
+  ci = 20 * 60
+)
+a <- simulation_esp_cut(param = parametres, p = 10000)
+parametres = list(
+  alpha = estim_max_likelihood[estim_max_likelihood$Repère == "D",]$Alpha_h,
+  beta = estim_max_likelihood[estim_max_likelihood$Repère == "D",]$Beta,
+  lambda = estim_param_duree_remplacement[
+    estim_param_duree_remplacement$Repère == "D",
+  ]$lambda_h,
+  tp = 10 / 60, # en heures
+  T = 60, # en heures
+  # Temps de remplacement périodique en heures
+  tp = 10 / 60,
+  # coût de changement fixe
+  cc = 30,
+  # coût d'indisponibilité par heures
+  ci = 20 * 60
+)
+b <- simulation_esp_cut(param = parametres, p = 10000)
 ```
 
 ```{r}
-afficher_variation_cut(seq(50,500,1), parametres, p = 5000)
+print(paste("Coût maintenance groupée à T = 60 : ", round(a + b, 4), "€/h"))
+```
+On a donc une légère augmentation du coût moyen par unité de temps, mais qui simplifie
+grandement la gestion de la politique de maintenance.
+
+## Optimisation de la politique de maintenance pour les éléments de la classe B, méthode ABAC et ABAD
+
+Nous avons défini une période d'inspection $t1 = 60h$ pour les éléments de classe A.
+
+Les éléments de la classe B seront alors optimisé à partir d'une politique similaire avec $t2 = 2t1 = 120$.
+
+On va comparer cette politique avec :
+- une politique basée uniquement sur les maintenances correctives
+- une politique optimale pour chaque élément
+
+### Coût d'une politique uniquement corrective
+
+```{r echo=FALSE}
+parametres = list(
+	alpha = estim_max_likelihood[
+		estim_max_likelihood$Repère == "E",
+	]$Alpha_h,
+	beta = estim_max_likelihood[estim_max_likelihood$Repère == "E",]$Beta,
+	lambda = estim_param_duree_remplacement[
+		estim_param_duree_remplacement$Repère == "E",
+	]$lambda_h,
+	tp = 10 / 60, # en heures
+	T = 150, # en heures
+	# Temps de remplacement périodique en heures
+	tp = 10 / 60,
+	# coût de changement fixe
+	cc = 30,
+	# coût d'indisponibilité par heures
+	ci = 20 * 60
+)
+reperes <- c("A", "F")
+for (w in reperes) {
+	parametres$alpha = estim_max_likelihood[
+		estim_max_likelihood$Repère == w,
+	]$Alpha_h
+	parametres$beta = estim_max_likelihood[
+		estim_max_likelihood$Repère == w,
+	]$Beta
+	parametres$lambda = estim_param_duree_remplacement[
+		estim_param_duree_remplacement$Repère == w,
+	]$lambda_h
+	p<- afficher_variation_cut(seq(20,600,1), parametres, p = 5000)
+	plot(p)
+}
+```
+Pour le composant "A", on peut observer un minimum autour de $110 \sim 120$. Pour le composant
+"F" en revanche, il semble que la politique préventive à un effet limité.
+On pourrait presque conseiller de ne pas l'utiliser et de préférer une politique
+de maintenance corrective.
+
+Pour le composant A, une politique uniquement corrective semble mener à un coût 
+d'environ $5€.h^{-1}$.
+
+Pour le composant F, une politique uniquement corrective semble mener à un coût 
+d'environ $7.5€.h^{-1}$.
+
+### Coût optimal par composant pour A et F
+
+```{r echo=FALSE}
+t_opti <- c()
+cut_opti <- c()
+for (w in reperes) {
+	
+	# Les paramètres
+	alpha = estim_max_likelihood[estim_max_likelihood$Repère == w,]$Alpha_h
+	beta = estim_max_likelihood[estim_max_likelihood$Repère == w,]$Beta
+	lambda = estim_param_duree_remplacement[
+		estim_param_duree_remplacement$Repère == w,
+	]$lambda_h
+	tp = 10 / 60 # en heures
+	T = 0 # en heures
+	# Temps de remplacement périodique en heures
+	tp = 10 / 60
+	# coût de changement fixe
+	cc = 30
+	# coût d'indisponibilité par heures
+	ci = 20 * 60
+	
+	# nombre de simulation
+	p <- 20000
+	# intervalle de recherche du T optimal
+	T_set <- seq(50,400,1)
+	n <- length(T_set)
+	res_list <- c()
+	for (t in T_set) {
+		sumT <- 0
+		sumC <- 0
+		for (i in 1:p) {
+			Tf <- rweibull(1, shape = beta, scale = alpha)
+			D <- rexp(1, rate = lambda)
+			if (Tf <= t) {
+				# Maintenance corrective
+				sumT = sumT + Tf + D
+				sumC = sumC + cc + D * ci
+			} else {
+				# Maintenance préventive
+				sumT = sumT + t + tp
+				sumC = sumC + cc + tp * ci
+			}
+		}
+		# calcul du coût moyen par unité de temps
+		res_list <- append(res_list, sumC/sumT)
+	}
+	
+	# Calcul de la moyenne mobile
+	moyenne_mobile <- c()
+	for (i in 3:(n-2)) {
+		moyenne_mobile <- c(moyenne_mobile,
+							mean(res_list[seq(i-2,i+2,1)]))
+	}
+	
+	t_opti <- c(t_opti, T_set[which(moyenne_mobile == min(moyenne_mobile))])
+	cut_opti <- c(cut_opti, min(moyenne_mobile))
+}
+politique_maintenance <- tibble(reperes,t_opti,cut_opti)
+politique_maintenance
+```
+
+On observe dans ce cas :
+
+- $T^*_A = 134$ et $\mathbb{E}[CUT(T^*_A)] = 4.534623 €.h^{-1}$
+- $T^*_F = 134$ et $\mathbb{E}[CUT(T^*_F)] = 7.356775 €.h^{-1}$
+
+Cela confirme que pour le composant F, par rapport à une politique corrective,
+l'amélioration est faible.
+
+### Politique ABAC ABAD avec $t2 = 2t1$
+
+Dans ce cas on prend une politique groupée pour A et F avec 
+
+```{r echo=FALSE}
+t1 <- 60
+t2 <- 2 * t1
+parametres$T = t2
+parametres$alpha = estim_max_likelihood[
+	estim_max_likelihood$Repère == "A",
+]$Alpha_h
+parametres$beta = estim_max_likelihood[
+	estim_max_likelihood$Repère == "A",
+]$Beta
+parametres$lambda = estim_param_duree_remplacement[
+	estim_param_duree_remplacement$Repère == "A",
+]$lambda_h
+a <- simulation_esp_cut(param = parametres, p = 10000)
+parametres$alpha = estim_max_likelihood[
+	estim_max_likelihood$Repère == "F",
+]$Alpha_h
+parametres$beta = estim_max_likelihood[
+	estim_max_likelihood$Repère == "F",
+]$Beta
+parametres$lambda = estim_param_duree_remplacement[
+	estim_param_duree_remplacement$Repère == "F",
+]$lambda_h
+b <- simulation_esp_cut(param = parametres, p = 10000)
 ```
 
 ```{r}
-afficher_variation_cut(seq(100,200,1), parametres, p = 5000)
+print(paste("Coût moyen par heure pour t2 = 120 pour le composant A :", a))
+print(paste("Coût moyen par heure pour t2 = 120 pour le composant F :", b))
+print(paste("Coût maintenance groupée à t2 = 120 : ", round(a + b, 4), "€/h"))
 ```
-```{r}
-afficher_variation_cut(seq(100,160,1), parametres, p = 10000)
-```
 
-Dans ce cas, le minimum est moins évident à trouver visuellement. Il semble se
-situer entre 120h et 140h pour un coût annuel de $4.55€.h^{-1}$.
+Avec cette méthode, on remarque que les composants de la classe A et B ont finalement
+le même coût de maintenance par heure, ce qui montre que l'optimisation
+est efficace pour la classe A.
 
-### Conclusion
+## Conclusion
 
-Nous avons donc touvé une politique de maintenance adaptée pour les composants
-E et D de la classe A, prioritaire.
+Pour une politique corrective uniquement, comme celle appliquée actuellement par
+l'entreprise on a :
+- pour E : $7 €.h^{-1}$
+- pour D : $13 €.h^{-1}$
+- pour A : $5€.h^{-1}$
+- pour F : $7.5€.h^{-1}$
 
-|Composant|T optimal|Coût moyen estimé par heures|
-|E|$110h \sim 120h$|$3€/h$|
-|D|$120h \sim 140h$|$4.55€/h$|
+Soit un coût total d'environ : $32.5 €.h^{-1}$ soit environ $283 \space 920€/ans$.
 
-On peut facilement envisager une politique commune, visant à effectuer toutes
-les maintenances préventives de tous les composants de la classe A.
+Si l'on applique les deux politiques groupées pour la classe A et B avec $t1 = 60h$ et
+$t2 = 2t1 = 120h$, on a : $24.2558€.h^{-1}$ soit environ $211 \space 898.7 €/ans$.
 
+On parle donc d'une amélioration de 25.37%.
 
+Je conseille donc à l'entreprise de mettre en place cette politique de maintance.
+
+Attention cependant, les résultats proposés reposent sur une analyse obtenue avec
+très peu de données.
