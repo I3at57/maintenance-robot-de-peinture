@@ -18,8 +18,8 @@ On pourra alors calculer un coût total de maintenance et observer quelles panne
 
 L'analyse des coût a permis d'identifier deux coûts associés à une panne :
 
-- le coût de remplacement (coût de changement) d'une pièce estimé à $30€$ ;
-- le coût d'inactivité estimé à $20€/min$.
+- le coût de remplacement (coût de changement) d'une pièce estimé à $30\mbox{€}$ ;
+- le coût d'inactivité estimé à $20\mbox{€}/min$.
 
 On constate immédiatement que le coût immobilisation est prépondérant dans.
 le coût total de la politique de maintenance : deux minutes d'arrêts sont plus coûteuses qu'un changement de pièce.
@@ -113,7 +113,7 @@ ggplot(mapping = aes(x = 0:9, y = y_set))+
 Avec ce graphique, on peut facilement voir par exemple que le temps d'arrêt
 cumulé des défaillances sur les repères E et D avoisine les 1500 minutes.
 
-Comme on connait le coût d'arrêt par minute qui est de $ci=20€/min$, on peut facilement
+Comme on connait le coût d'arrêt par minute qui est de $ci=20\mbox{€}/min$, on peut facilement
 produire le même graphique mais cette fois en € :
 
 ```{r}
@@ -209,9 +209,9 @@ On voit bien qu'il y a un changement de comportement visible entre le composant 
 le composant A, de même qu'entre le composant F et le composant I (on passe de 530 à
 185 puis de 160 à 94).
 
-Cependant, cette méthode colle assez peu à la "philosophie" de la classification
-ABC. En effet, notre classe A représente bien environ 20% des données mais seulement
-74% des effets.
+### Autre classification possible
+
+Notre classe A représente bien environ 20% des données mais seulement 74% des effets.
 
 On peut aussi décider d'inclure le composant A dans la classe A et le composant
 I à la classe B, ce qui donne :
@@ -273,6 +273,17 @@ ggplot(mapping = aes(x = 0:9, y = 100*y_set/temps_arret_total))+
     custom_theme
 ```
 
+Avec cette autre proposition de classification, on inclue le composant A
+à la classe A, prioritaire.
+
+Avec les éléments disponibles, je ne suis pas en mesure de trancher sur la classification la plus pertienente pour l'entreprise.
+
+Le choix peut se faire par exemple à partir du retour d'expérience
+des opérateur qui jugeront si le composant A est effectivement
+aussi prioritaire que les composants E et D
+
+### Analsye du ratio discriminant
+
 Pour trancher entre les deux méthodes, je propose de réexploiter la méthode présentée
 par Pr. Amodeo dans l'UE GP27 : gestion des stocks.
 
@@ -307,6 +318,14 @@ présenté plus haut, on en conclut que :
 
 Ce résultat conforte la première classification proposée avec :
 
-- classe A : E & D (22% des éléments)
-- classe B : A & F (22% des éléments)
-- classe C : le reste (56% des éléments)
+- classe A : composants E & D (22% des éléments)
+- classe B : composants A & F (22% des éléments)
+- classe C : le reste des composants (56% des éléments).
+
+## Conclusion de la classification
+
+Nous avons donc identifié, à l'aide de la classification de Pareto augmentée par analyse du ratio discriminant, les composants prioritaires : E et D, qui sont rangés dans ce qu'on
+nommera à présent la "Classe A".
+
+Les composants A et F, rangés dans la "Classe B" sont des composants jugés non prioritaires mais dont la maintenance peut
+être optimisée si cette optimisation peut se faire à moindre coûts.

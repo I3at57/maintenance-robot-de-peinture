@@ -1,23 +1,55 @@
-## Estimation des durées de vie de chaque élément.
+## Estimation des modèles du comportement des composants
 
-On cherche à présent à définir la durée de vie de chaque élément du robot. Cette
-information sera utile pour ensuite pour créer un modèle permettant l'optimisation
-de la politique de maintenance.
+Pour proposer une optimisation de la politique de maintenance,
+il est essentiel de d'abord définir les modèles de durée de vie
+des composants et les modèles de temps de réparation.
 
-### Modèle mathématique
+Notre optimisation reposant sur des simulations du systèmes, nous
+devons définir le comportant de nos composants à travers ces
+modèles de maintenance et de durée de vie.
+
+### Estimation des loi de durée de vie des composants
+
+#### Modèle mathématique
+
+Classiquement, les durée de vie des composants et les temps de réparation sont
+modélisés par des variables aléatoires.
 
 On suppose que la durée de bon fonctionnement avant la panne de chaque composant
 $\omega$, avec $\omega \in [A,B,D,E,F,G,H,I,J]$ est une variable aléatoire
 notée $T_{\omega}$ à valeur dans $\mathbb{R}_+^*$.
 
+> Cela signifie que le temps entre la mise en service du composant et sa panne est une valeur $T_{\omega}$ aléatoire (que l'on ne peut prédire) positive plus grande que 0
+
 On suppose que les $T_{\omega}$ suivent une loi de Weibull de paramètre d'échelle
 $\alpha$ et de forme $\beta$.
 On note alors $T_{\omega} \sim \mathbf{W}(\alpha_{\omega},\beta_{\omega})$.
 
-On cherche alors a estimer les paramètres $(\alpha_{\omega},\beta_{\omega})$,
+Cette hypothèse est classique dans les différents modèles de maintenance et semble avoir été confirmé par les experts de l'entreprise.
+
+On considère cette hypothèse comme vraie tout en gardant à l'esprit qu'il serait préférable de la confirmer avec un plan
+d'expérience supplémentaire.
+
+On cherche alors a estimer les paramètres $(\alpha_{\omega},\beta_{\omega})$ de nos lois de Weibull,
 pour avoir une idée plus précise du comportement des composants.
 
-### Méthode d'estimation par maximum de vraissemblance
+Dans une loi de Weibull, le paramètre $\alpha_{\omega}$ définit
+l'ordre de grandeur de la valeur $T_{\omega}$ (plus
+$\alpha_{\omega}$ est grand plus $T_{\omega}$ est grand).
+$\beta_{\omega}$ quand à lui sert à décrire le
+vieillissement du composant.
+
+En fonction des contextes il existe plusieurs familles de méthodes
+d'estimation possible :
+
+- les estimations paramétriques, qui sont utilisée quand on a une hypothèse de modèle (c'est notre cas ici).
+- les estimations non paramétriques, en l'absence de modèle
+- les estimations bayésiennes, pouvant intégrer des avis d'experts (utiles avec peu de données).
+
+J'ai décidé d'utiliser une estimation paramétrique par méthode du
+maximum de vraisemblance.
+
+#### Méthode d'estimation par maximum de vraissemblance
 
 Wikipédia définit [la vraisemblance](https://fr.wikipedia.org/wiki/Fonction_de_vraisemblance) comme :
 "fonction des paramètres d'un modèle statistique calculée à partir de données observées".
@@ -43,7 +75,7 @@ prises par mon modèle les plus "vraisemblables".
 
 La maximisation passe par l'annulation dérivée (ou les dérivées partielles) suivant les paramètres.
 
-### Application au cas de la loi de Weibull
+#### Application au cas de la loi de Weibull
 
 On se place dans un cas de maintenance parfaite (chaque maintenance remet à neuf
 le système en remplaçant les composants) suivant une loi de Weibull.
@@ -56,7 +88,7 @@ e^{-\left( \frac{x_i}{\alpha}\right)^{\beta}}
 $$
 
 Le calcul de la vraisemblance est donc relativement complexe. Si l'on souhaite une
-solution analytique au problème, il est préférable de passer la log-vraissemblance.
+solution analytique au problème, il est préférable de passer par la log-vraissemblance.
 
 En effet, la fonction logarithme étant croissante, maximiser la log-vraissemblance
 revient à maximiser la vraisemblance.
@@ -72,14 +104,17 @@ $$
   \end{array}
 \right.
 $$
+
 que l'on doit résoudre pour obtenir $\beta^*$ et $\alpha^*$ qui sont alors les
 estimateurs du maximum de vraisemblance que l'on notera $\hat{\alpha}_{MV}$ et
 $\hat{\beta}_{MV}$.
 
 Plusieurs solutions existent pour obtenir ses estimateurs sans passer par la résolution
-de ce système.
+de ce système qui est très calculatoire.
 
-### Construction des données
+#### Construction des données
+
+Préalablement aux calcul numérique de nos estimateurs, nous devons préparer nos données.
 
 Pour estimer les paramètres des lois, on utilise les données d'analyse de durées
 de défaillance entre deux pannes (en heures).
@@ -96,11 +131,11 @@ durees_inter_panne <- list(
 )
 ```
 
-Ici la liste `durees_inter_panne` contient les durées inter-panne en heure. Cependant, nous avions stocké les temps d'arrêt
+Ici la liste `durees_inter_panne` contient les durées inter-panne en heure.
 
-### Estimations
+#### Estimations
 
-#### Utilisation de `nlm`
+##### Utilisation de `nlm`
 
 La fonction `nlm` permet de minimiser une fonction dans R suivant un jeu de
 paramètre.
@@ -178,7 +213,7 @@ for (xi in durees_inter_panne) {
 On a donc pour chaque composant du robot, l'estimations des paramètres de la
 durée de vie suivant une loi de Weibull.
 
-#### Fonction `eweibull`
+##### Fonction `eweibull`
 
 Cette fonction du package `EnvStats` effectue l'estimation des paramètre d'une
 loi de Weibull suivant la méthode du maximum de vraisemblance directement à partir
@@ -203,19 +238,19 @@ ewebull_estim
 estim_max_likelihood
 ```
 
-Malgré de très légères différences, les deux solutions permettent d’obtenir les
-mêmes estimateurs.
+Les deux solutions obtiennent des résultats très proches, ce qui
+nous conforte dans nos estimations.
 
 Je décide de conserver les résultat obtenus à l'aide de la première méthode contenus
-dans le vecteur `estim_max_likelihood`.
+dans le vecteur `estim_max_likelihood` pour le reste de l'étude.
 
 ```{r}
 # Place la colonne Repère en premier dans on dataframe
 estim_max_likelihood <- estim_max_likelihood %>% relocate(Repère)
 ```
 
-On peut ensuite tracer les densités associées et donner le $MTTF$ pour mieux
-se représenter les comportement des composants.
+On peut ensuite tracer les densités associées
+se représenter le comportement des composants.
 
 ```{r}
 composants <- c("Electrovanne pistolet",
@@ -280,7 +315,17 @@ ggplot() +
     custom_theme
 ```
 
+Plusieurs analyse peuvent être faite rien qu'avec ce graphique :
 
+- le composant I (coubre noire) (Classe C non prioritaire), suit en réalité une
+loi exponentielle (que l'on reconnait à la forme de la densité). On a donc : $\hat{\beta}_{I_{MV}} \simeq 1$.
+
+- les estimations ne sont pas effectuées avec le même nombre de
+mesures pour chaque composant, ces résultats doivent être interprétés avec précaution.
+
+- le composant E (courbe verte), bien que présent dans la classe A, ne semble pas avoir la valeur moyenne (proche du point le plus haut de la courbe) le plus faible : ce n'est donc pas le composant qui tombe le plus vite en panne.
+Pour rappel, la classification est faite sur le temps d'inactivité (donc le temps de réparation) et non la durée de vie
+des composants. Si un composant tombe souvent en panne mais prend quelques minutes à remplacer, il ne sera pas prioritaire car il n'engendrera pas beaucoup de coûts d’inactivité.
 
 On peut ensuite calculer le $MTTF$. Pour une loi de Weibull, on a
 $E[X_i]=\alpha \Gamma (1+\frac{1}{\beta})$
@@ -296,8 +341,8 @@ estim_max_likelihood
 ```
 
 Toutes les valeurs manipulées sont en heures de fonctionnement.
-
-Je propose de les convertir en minutes.
+Je propose de les convertir en minutes pour pouvoir les
+manipuler avec les temps de remplacements (eux en minutes).
 
 ```{r}
 estim_max_likelihood <- estim_max_likelihood %>%
@@ -309,8 +354,11 @@ estim_max_likelihood <- estim_max_likelihood %>%
 estim_max_likelihood
 ```
 
+On peut à ce stade conclure par exemple que, d'après notre étude
+statistique basée sur les données récoltées le composant E tombe
+en panne au bout de d'environ $203h$ de fonctionnement.
 
-## Estimation des distributions des durées de changement correctif pour chaque élément.
+### Estimation des lois de réparation des composants
 
 Après avoir estimé les les paramètres des lois de Weibull des durées inter-panne
 (loi de durée de vie) des composants du robot, on va maintenant chercher
@@ -331,8 +379,7 @@ $$
 
 Soit l'inverse de la moyenne empirique de l'échantillon mesurée $\hat{m}$.
 
-Les durée de temps d'arrêt stockée dans `df_abc_noNA` étant en minutes, je propse de les convertir en heures pour garder la cohérence
-avec les durée de fonctionnement estimées précédement.
+Les durée de temps d'arrêt stockée dans `df_abc_noNA` étant en minutes, je propose de les convertir en heures pour garder la cohérence et conserver les deux options pour plus tard.
 
 ```{r}
 df_abc_noNA <- df_abc %>% 
@@ -371,7 +418,7 @@ On a donc a présent pour les composants du robot :
 - une estimation du temps de remplacement du composant
 (temps d'immobilisation du robot engendré. Loi exponentielles et le paramètre associé).
 
-## Discussions des résultats
+### Discussions des résultats
 
 Les résultats obtenus peuvent être critiqués et doivent être mit en perspective
 avec le contexte général de l'analyse.
