@@ -1,4 +1,7 @@
-## Optimisation de la politique de maintenance pour les éléments de la classe A
+# Optimisation de la politique de maintenance pour les éléments de la classe A
+
+Nous sommes maintenant en mesure de procéder à l'optimisation des éléments de la
+classe A.
 
 L'optimisation s'effectuera en deux temps. On cherchera abord à construire une
 méthode pour simuler le coût moyen par unité de temps d'une politique de maintenance
@@ -18,7 +21,7 @@ Je considère une politique de maintenance basée sur l'âge. Quand le système 
 panne et commence immédiatement la réparation.
 On considère donc négligeable le temps de déplacement de l'opérateur au robot, et on considère qu'il possède immédiatement à porté les outils et pièces de rechange nécessaires à la maintenance.
 
-### Détermination du coût de maintenance moyen par unité de temps en fonction de la politique de maintenance pour tout $T$.
+## Détermination du coût de maintenance moyen par unité de temps en fonction de la politique de maintenance pour tout $T$.
 
 On cherche à simuler le coût moyen par unité de temps de la maintenance en fonction
 de la politique de maintenance.
@@ -55,7 +58,7 @@ $$
 \frac{\mathbb{E}[CC_r(T)]}{\mathbb{E}[T_r(T)]}
 $$
 
-#### Détermination de la loi de remise en service $T_r(T)$
+## Détermination de la loi de remise en service $T_r(T)$
 
 On considère une politique de remplacement basée sut âge de élément.
 A partir de la mise en service du robot (soit la mise en service initiale, soit après le remplacement d'une pièce), on note $T_r(T)$ la durée aléatoire du cycle jusqu'à la
@@ -154,7 +157,7 @@ politique de maintenance demandée par le client.
 Le calcul explicite de $\mathbb{E}[T_r]$ est complexe. On passe donc par la simulation
 pour trouver la valeur de $\mathbb{E}[T_r]$ pour chaque composants.
 
-#### Création d'une fonction de simulation pour $\mathbb{E}[T_r]$
+## Création d'une fonction de simulation pour $\mathbb{E}[T_r]$
 
 Je propose de créer une fonction `simulation_esp_Tr`
 qui peut simuler $\mathbb{E}[T_r]$ en fonction :
@@ -218,9 +221,9 @@ simulation_esp_Tr(parametres, p = 10000)
 Cette fonction permet donc de simuler le système avec une politique de maintenance pour $T$ et d'observer le temps moyen avant
 la panne et remise en service (cycle) du composant E.
 
-#### Détermination du coût cumulé jusqu'à la remise en service
+## Détermination du coût cumulé jusqu'à la remise en service
 
-Pour obtenir cette information, on va procéder de la même facon que pour la loi de
+Pour obtenir cette information, on va procéder de la même façon que pour la loi de
 remise en service.
 
 Le coût cumulé de maintenance à la remise en service, noté $CC_r$ est une variable
@@ -260,7 +263,7 @@ $$
 
 Le coût final à $T_r$ ne dépend donc que de $T$ en moyenne. 
 
-#### Création d'une fonction de simulation pour $\mathbb{E}[CC_r]$
+## Création d'une fonction de simulation pour $\mathbb{E}[CC_r]$
 
 On peut à la fois utiliser la formule littérale ou une simulation pour calculer
 ce coût pour en fonction des paramètres du systèmes (composant ou $T$).
@@ -327,7 +330,7 @@ calcul_esp_CCr(param = parametres)
 simulation_esp_CCr(param = parametres, p = 50000)
 ```
 
-#### Évaluation de l'espérance du coût moyen par unité de temps de la maintenance
+## Évaluation de l'espérance du coût moyen par unité de temps de la maintenance
 
 Nous disposons à présent de tous les éléments pour calculer le coût moyen par
 unité de temps en fonction des paramètres (T, composant) du système :
@@ -505,7 +508,7 @@ environ, avec une période de $T^*_E \simeq [110;120]$
 
 On peut donc effectuer ce travail de recherche pour tous les composants.
 
-### Optimisation de la recherche
+### Automatisation de la recherche
 
 Cette méthode graphique prend un temps important. Pour optimiser la recherche,  je
 propose d'écrire un script qui calcul le minimum pour les composants de la classe
@@ -581,7 +584,14 @@ de légèrement lisser sauts aléatoires dûs à la simulation.
 Elle sort ensuite la meilleure valeure trouvée pour $T^*_{\omega}$ et le coût
 moyen associé.
 
+\begin{center}
+\setlength{\fboxsep}{10pt}
+\setlength{\fboxrule}{2pt}
+\fbox{%
+  \parbox{\textwidth}{%
+
 On va donc mettre en place les politiques suivantes :
+
 - Composant E : $T^*_E = 104$ et $\mathbb{E}[CUT(T^*_E)] \simeq 2.980781 \mbox{€}.h^{-1}$
 contre un coût de $\mathbb{E}[CUT(\infty)] \simeq 7 \mbox{€}.h^{-1}$ si l'on
 ne fait que de la maintenance corrective. Celà représente une diminution de près
@@ -591,6 +601,10 @@ de 57,12% des coûts liés au composant E.
 contre un coût de $\mathbb{E}[CUT(\infty)] \simeq 13 \mbox{€}.h^{-1}$ si l'on
 ne fait que de la maintenance corrective. Celà représente une division de près
 de 37.57% des coûts liés au composant E.
+
+  }%
+}
+\end{center}
 
 ```{r eval=FALSE, include=FALSE}
 parametres = list(
@@ -726,6 +740,7 @@ for (w in reperes) {
 	plot(p)
 }
 ```
+
 Pour le composant "A", on peut observer un minimum autour de $110 \sim 120$. Pour le composant
 "F" en revanche, il semble que la politique préventive à un effet limité.
 On pourrait presque conseiller de ne pas l'utiliser et de préférer une politique
@@ -849,11 +864,21 @@ est efficace pour la classe A.
 
 ## Conclusion
 
+\begin{center}
+\setlength{\fboxsep}{10pt}
+\setlength{\fboxrule}{2pt}
+\fbox{%
+  \parbox{\textwidth}{%
+
 Pour une politique corrective uniquement, comme celle appliquée actuellement par
 l'entreprise on a :
+
 - pour E : $7 \mbox{€}.h^{-1}$
+
 - pour D : $13 \mbox{€}.h^{-1}$
+
 - pour A : $5\mbox{€}.h^{-1}$
+
 - pour F : $7.5\mbox{€}.h^{-1}$
 
 Soit un coût total d'environ : $32.5 \mbox{€}.h^{-1}$ soit environ $283 \space 920\mbox{€}/ans$.
@@ -861,9 +886,13 @@ Soit un coût total d'environ : $32.5 \mbox{€}.h^{-1}$ soit environ $283 \spac
 Si l'on applique les deux politiques groupées pour la classe A et B avec $t1 = 60h$ et
 $t2 = 2t1 = 120h$, on a : $24.2558\mbox{€}.h^{-1}$ soit environ $211 \space 898.7 \mbox{€}/ans$.
 
-On parle donc d'une amélioration de 25.37%.
+On a donc d'une amélioration de 25.37 \%.
 
-Je conseille donc à l'entreprise de mettre en place cette politique de maintance.
+  }%
+}
+\end{center}
+
+Je conseille donc à l'entreprise de mettre en place cette politique de maintenance.
 
 Attention cependant, les résultats proposés reposent sur une analyse obtenue avec
 très peu de données.

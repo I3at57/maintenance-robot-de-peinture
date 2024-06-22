@@ -9,6 +9,10 @@ output:
   word_document:
     toc: true
     toc_depth: '4'
+  html_document:
+    toc: true
+    toc_depth: '4'
+    df_print: paged
 ---
 
 ```{r setup, include=FALSE}
@@ -39,7 +43,7 @@ custom_theme <- theme(
 )
 ```
 
-```{r}
+```{r layout="l-body-outset"}
 # récupération des données depuis le document excel
 df <- readxl::read_xlsx("data/Historique panne.xlsx")
 # le symbole '%>%' est nommé 'pipe' et signifie : passer en argument
@@ -48,23 +52,19 @@ df <- readxl::read_xlsx("data/Historique panne.xlsx")
 df %>% head()
 ```
 
-```{r child = './src/parts/intro.Rmd'}
+```{r child = "./src/parts/intro.Rmd"}
 
 ```
 
 
-```{r child = './src/parts/classification_ABC.Rmd'}
+```{r child = "./src/parts/classification_ABC.Rmd"}
 
 ```
 
-```{r child = './src/parts/estimations.Rmd'}
+```{r child = "./src/parts/estimations.Rmd"}
 
 ```
 
-```{r child = './src/parts/optimisation_classe_A.Rmd}
-
-```
-
-```{r child = './src/parts/optimisation_classe_A.Rmd}
+```{r child = "./src/parts/optimisation_classe_A.Rmd"}
 
 ```

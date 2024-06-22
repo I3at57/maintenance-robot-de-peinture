@@ -1,4 +1,9 @@
-## Classification des pannes par la méthode ABC.
+---
+output:
+  pdf_document: default
+  html_document: default
+---
+# Classification des pannes par la méthode ABC.
 
 Le principe de Pareto stipule qu'environ 80 % des effets sont le produit de 20 % des causes ([Principe de Pareto, Wikipédia](https://fr.wikipedia.org/wiki/Principe_de_Pareto)). Ce principe général à été observé par l'italien Vilfredo Pareto et on peut l'appliquer 
 à différents phénomène observables.
@@ -14,7 +19,7 @@ Pour chaque panne identifiées par le retour d'expérience, on va calculer le co
 
 On pourra alors calculer un coût total de maintenance et observer quelles pannes contribuent le plus à ce coût total. Ces pannes seront alors prioritaires dans nos améliorations de politiques de maintenance.
 
-### Calcul du coût d'une panne.
+## Calcul du coût d'une panne.
 
 L'analyse des coût a permis d'identifier deux coûts associés à une panne :
 
@@ -27,6 +32,8 @@ le coût total de la politique de maintenance : deux minutes d'arrêts sont plus
 Le coût de remplacement étant fixe et identique pour chaque composant du robot, on peut se concentrer sur le coût d'immobilisation dans notre classification.
 
 On va donc construire un diagramme ABC basée sur le temps d'arrêt des pannes associé à chaque élément pour identifier les éléments dont les pannes immobilisent le plus le robot.
+
+## Classification
 
 ### Construction du graphique ABC
 
@@ -310,17 +317,32 @@ ggplot(mapping = aes(x = 0:9, y = y_set*100/max(y_set)))+
     custom_theme
 ```
 
+\begin{center}
+\setlength{\fboxsep}{10pt}
+\setlength{\fboxrule}{2pt}
+\fbox{%
+  \parbox{\textwidth}{%
+
 Par lecture graphique on en conclut que $0.85 > RD > 0.75$. Si l'on reprend le tableau
 présenté plus haut, on en conclut que :
+
 - la classe A doit représenter 20 % des éléments
+
 - la classe B doit représenter 20% des éléments
+
 - la classe C doit représenter 60% des éléments
 
 Ce résultat conforte la première classification proposée avec :
 
-- classe A : composants E & D (22% des éléments)
-- classe B : composants A & F (22% des éléments)
+- classe A : composants E et D (22% des éléments)
+
+- classe B : composants A et F (22% des éléments)
+
 - classe C : le reste des composants (56% des éléments).
+
+  }%
+}
+\end{center}
 
 ## Conclusion de la classification
 

@@ -145,3 +145,44 @@ simulation_esp_cut <- function(param, p = 1000) {
 	
 	return(mean(list_traj$cout)/mean(list_traj$temps))
 }
+
+# Les paramètres doivent être passés en argument au format
+# param = list(
+#	estim = tableau de valeurs
+#	T = X, # Période d'inspection
+#	tp = X # durée de remplacement périodique
+#	ci = X, # coût d'interruption
+#	cc = X, # coût de changement
+#	
+# )
+
+simulation_esp_cut_groupee <- function(param, p = 1000) {
+	
+	# Routine pour calculer par simulation l'espérance du coût à date de remise en
+	# service E[CCr]
+	# Simuler une trajectoire revient à simuler le système et récupérer le coût
+	# total à date de remplacement
+	# Pour obtenir la moyenne, on recommence le processus un grand nombre de fois
+	# et on prend la moyenne
+	
+	# contient les trajectoires du système.
+	list_traj <- list(temps = c(), cout = c())
+	for (i in 1:p) {
+		# Simule une date de panne
+		Tf <- rweibull(1, shape = param$beta, scale = param$alpha)
+		# Simule une durée de réparation
+		D <- rexp(1, rate = param$lambda)
+		if (Tf <= param$T) {
+			# Maintenance corrective
+			list_traj$temps = c(list_traj$temps, Tf + D)
+			list_traj$cout = c(list_traj$cout, param$cc + D * param$ci)
+		} else {
+			# Maintenance préventive
+			list_traj$temps = c(list_traj$temps, param$T + param$tp)
+			list_traj$cout = c(list_traj$cout,
+							   param$cc + param$tp * param$ci)
+		}
+	}
+	
+	return(mean(list_traj$cout)/mean(list_traj$temps))
+}

@@ -1,4 +1,4 @@
-## Estimation des modèles du comportement des composants
+# Estimation des modèles de comportement des composants
 
 Pour proposer une optimisation de la politique de maintenance,
 il est essentiel de d'abord définir les modèles de durée de vie
@@ -8,9 +8,7 @@ Notre optimisation reposant sur des simulations du systèmes, nous
 devons définir le comportant de nos composants à travers ces
 modèles de maintenance et de durée de vie.
 
-### Estimation des loi de durée de vie des composants
-
-#### Modèle mathématique
+## Modèle mathématique
 
 Classiquement, les durée de vie des composants et les temps de réparation sont
 modélisés par des variables aléatoires.
@@ -49,7 +47,7 @@ d'estimation possible :
 J'ai décidé d'utiliser une estimation paramétrique par méthode du
 maximum de vraisemblance.
 
-#### Méthode d'estimation par maximum de vraissemblance
+## Méthode d'estimation par maximum de vraissemblance
 
 Wikipédia définit [la vraisemblance](https://fr.wikipedia.org/wiki/Fonction_de_vraisemblance) comme :
 "fonction des paramètres d'un modèle statistique calculée à partir de données observées".
@@ -75,7 +73,7 @@ prises par mon modèle les plus "vraisemblables".
 
 La maximisation passe par l'annulation dérivée (ou les dérivées partielles) suivant les paramètres.
 
-#### Application au cas de la loi de Weibull
+## Application au cas de la loi de Weibull
 
 On se place dans un cas de maintenance parfaite (chaque maintenance remet à neuf
 le système en remplaçant les composants) suivant une loi de Weibull.
@@ -112,7 +110,9 @@ $\hat{\beta}_{MV}$.
 Plusieurs solutions existent pour obtenir ses estimateurs sans passer par la résolution
 de ce système qui est très calculatoire.
 
-#### Construction des données
+## Estimations des lois de panne
+
+### Construction des données
 
 Préalablement aux calcul numérique de nos estimateurs, nous devons préparer nos données.
 
@@ -133,9 +133,7 @@ durees_inter_panne <- list(
 
 Ici la liste `durees_inter_panne` contient les durées inter-panne en heure.
 
-#### Estimations
-
-##### Utilisation de `nlm`
+### Utilisation de `nlm`
 
 La fonction `nlm` permet de minimiser une fonction dans R suivant un jeu de
 paramètre.
@@ -213,7 +211,7 @@ for (xi in durees_inter_panne) {
 On a donc pour chaque composant du robot, l'estimations des paramètres de la
 durée de vie suivant une loi de Weibull.
 
-##### Fonction `eweibull`
+### Fonction `eweibull`
 
 Cette fonction du package `EnvStats` effectue l'estimation des paramètre d'une
 loi de Weibull suivant la méthode du maximum de vraisemblance directement à partir
@@ -244,7 +242,7 @@ nous conforte dans nos estimations.
 Je décide de conserver les résultat obtenus à l'aide de la première méthode contenus
 dans le vecteur `estim_max_likelihood` pour le reste de l'étude.
 
-```{r}
+```{r include=FALSE}
 # Place la colonne Repère en premier dans on dataframe
 estim_max_likelihood <- estim_max_likelihood %>% relocate(Repère)
 ```
@@ -252,7 +250,7 @@ estim_max_likelihood <- estim_max_likelihood %>% relocate(Repère)
 On peut ensuite tracer les densités associées
 se représenter le comportement des composants.
 
-```{r}
+```{r include=FALSE}
 composants <- c("Electrovanne pistolet",
                 "Vérins ",
                 "Bras horizontal - Poignets de programmation",
@@ -358,7 +356,7 @@ On peut à ce stade conclure par exemple que, d'après notre étude
 statistique basée sur les données récoltées le composant E tombe
 en panne au bout de d'environ $203h$ de fonctionnement.
 
-### Estimation des lois de réparation des composants
+## Estimation des lois de réparation des composants
 
 Après avoir estimé les les paramètres des lois de Weibull des durées inter-panne
 (loi de durée de vie) des composants du robot, on va maintenant chercher
@@ -413,12 +411,12 @@ estim_param_duree_remplacement$temps_arret_moyen_m <- 1/estim_param_duree_rempla
 estim_param_duree_remplacement
 ```
 
+## Conclusion et discussions des résultats
+
 On a donc a présent pour les composants du robot :
 - un estimation de la durée de vie du composant (loi de Weibull et les paramètres associés)
 - une estimation du temps de remplacement du composant
 (temps d'immobilisation du robot engendré. Loi exponentielles et le paramètre associé).
-
-### Discussions des résultats
 
 Les résultats obtenus peuvent être critiqués et doivent être mit en perspective
 avec le contexte général de l'analyse.

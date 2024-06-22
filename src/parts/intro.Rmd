@@ -5,7 +5,7 @@ pistolet de peinture.
 
 ![Plan schématique d'un robot de peinture](./img/image_robot.png)
 
-## Présentation du robot
+# Présentation du robot
 
 Le robot à pour mission de positionner dans l'espace un pistolet à
 peinture. Le pistolet est actionné par un autre système qui n'est pas
@@ -24,7 +24,7 @@ Le robot est composé des éléments suivants :
 - (I) Carte DH ;
 - (J) Carte Servo.
 
-## Objectif de l'analyse
+# Objectif de l'analyse
 
 L'objectif est de proposer pour l'entreprise un nouveau plan de maintenance visant à minimiser
 les coûts associés à la maintenance de ce robot.
